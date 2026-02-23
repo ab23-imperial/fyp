@@ -286,7 +286,7 @@ while True:
           delta_to_end = None
 
 
-    ui.update(advice)
+    ui.update(advice, window_index, delta)
 
     print(
     f"dist={sim_distance:.1f}m | "
