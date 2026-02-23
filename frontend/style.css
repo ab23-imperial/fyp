@@ -1,0 +1,47 @@
+body {
+  margin: 0;
+  font-family: sans-serif;
+}
+
+#map {
+  width: 100vw;
+  height: 100vh;
+}
+
+#controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: white;
+  padding: 10px;
+  z-index: 1;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+#info {
+  margin-top: 8px;
+}
+
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.distance-label {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+
+  padding: 4px 8px;
+  border-radius: 6px;
+
+  white-space: nowrap;
+  pointer-events: none;
+
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.35);
+}
