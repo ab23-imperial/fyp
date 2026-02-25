@@ -13,18 +13,18 @@ from ui.simple_ui import SignalUI
 STATE_WINDOW = 5
 DETECT_INTERVAL = 0.1  # seconds
 
-SIM_SPEED = 12.0        # m/s (~43 km/h)
-SIM_INITIAL_DISTANCE = 120.0  # metres
+SIM_SPEED = 15        # m/s (~43 km/h)
+SIM_INITIAL_DISTANCE = 110  # metres
 
-GREEN_DURATION = 8.0
-AMBER_DURATION = 2.0
-RED_DURATION = 4.0
+GREEN_DURATION = 8
+AMBER_DURATION = 2
+RED_DURATION = 4
 
 VIDEO_PATH = "test_videos/tv1.mp4"
 
 VISION_RANGE_THRESHOLD = 50.0  # metres: below this we trust vision
 
-MOCK_REPORTS = ["red", "red", "green"]
+MOCK_REPORTS = ["red", "green", "red", "green"]
 
 # -------------------------
 # INITIALIZATION
@@ -240,7 +240,12 @@ while True:
         state_buffer.append(result.state)
         
     # --- MOCK EXTERNAL REPORTS ---
-    last_report_time, mri = generate_mock_reports(phase_reports, last_report_time, mri)
+    last_report_time, mri = generate_mock_reports(
+        phase_reports,
+        last_report_time,
+        mri,
+        interval=2.5   # instead of 3.0
+    )
     remove_expired_reports(phase_reports)
 
     # --- PHASE TRACKING ---
@@ -275,6 +280,13 @@ while True:
               arrival_time,
               T_g
           )
+          
+          C = GREEN_DURATION + AMBER_DURATION + RED_DURATION
+
+          if T_g is not None:
+              phase_position = (arrival_time - T_g) % C
+          else:
+              phase_position = None
 
           advice = advisory_from_delta(delta_to_start, delta_to_end)
           delta = delta_to_start
@@ -285,8 +297,19 @@ while True:
           delta_to_start = None
           delta_to_end = None
 
-
-    ui.update(advice, window_index, delta)
+    ui.update(
+        advice,
+        window_index,
+        delta,
+        distance=sim_distance,
+        eta=arrival_time,
+        phase_position=phase_position,
+        green_dur=GREEN_DURATION,
+        amber_dur=AMBER_DURATION,
+        red_dur=RED_DURATION,
+        red_before_dur=RED_DURATION,   # you can customise later
+        red_after_dur=RED_DURATION     # same here for now
+    )
 
     print(
     f"dist={sim_distance:.1f}m | "
