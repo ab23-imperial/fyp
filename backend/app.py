@@ -1,0 +1,42 @@
+from flask import Flask, request, jsonify, send_from_directory
+from core import step_logic_only
+import time
+
+app = Flask(__name__, static_folder="../frontend")
+
+# persistent state
+state = {
+    "sim_distance": 100,
+    "current_phase": None,
+    "phase_start_time": None,
+    "last_update_time": time.time(),
+}
+
+state_buffer = []
+phase_reports = {}
+
+# serve index.html
+@app.route("/")
+def home():
+    return send_from_directory("../frontend", "index.html")
+
+# serve JS and other static files
+@app.route("/<path:path>")
+def static_files(path):
+    return send_from_directory("../frontend", path)
+
+@app.route("/gps", methods=["POST"])
+def gps():
+    data = request.json
+
+    result = step_logic_only(
+        state,
+        state_buffer,
+        phase_reports,
+        data
+    )
+
+    return jsonify(result)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5050)

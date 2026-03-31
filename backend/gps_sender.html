@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h1>GPS Test</h1>
+<script>
+navigator.geolocation.watchPosition(pos => {
+  fetch("http://192.168.0.239:5050/gps", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      speed: pos.coords.speed
+    })
+  });
+});
+</script>
+</body>
+</html>
