@@ -1,17 +1,25 @@
 # main.py
 
 from flask import Flask, request, send_file
-from ultralytics import YOLO
+# from ultralytics import YOLO
 import cv2
 import numpy as np
 import random
 import io
+from roboflow import Roboflow
+import supervision as sv
+import os
+
+# Initialize Roboflow model
+rf = Roboflow(api_key=os.environ["ROBOFLOW_API_KEY"])
+project = rf.workspace().project("traffic-light-v9orl")
+model = project.version(3).model
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Load YOLOv8 model (nano for speed)
-model = YOLO('yolov8n.pt')  # change to 'yolov8s.pt' or custom weights if fine-tuned
+# # Load YOLOv8 model (nano for speed)
+# model = YOLO('yolov8n.pt')  # change to 'yolov8s.pt' or custom weights if fine-tuned
 
 def infer_light_colour(crop):
     hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
@@ -62,59 +70,48 @@ def infer_light_colour(crop):
     # Optional: if still ambiguous
     return ""
 
-def detect_and_annotate(img):
-    results = model(img, save=False)
+def detect_and_annotate(img, confidence_threshold=35):
+    # Run Roboflow hosted model
+    result = model.predict(img, confidence=confidence_threshold, overlap=30).json()
+    preds = result.get("predictions", [])
 
-    detections = []
-
-    # First pass: collect valid traffic light detections
-    for r in results:
-        for box, score, cls in zip(r.boxes.xyxy, r.boxes.conf, r.boxes.cls):
-            if int(cls) == 9:
-                x1, y1, x2, y2 = map(int, box)
-                detections.append((x1, y1, x2, y2, float(score)))
-
-    if not detections:
+    if not preds:
         return img
 
-    # Find highest confidence detection
-    best_det = max(detections, key=lambda x: x[4])
+    # Map classes to integers for supervision
+    class_name_to_idx = {"Red": 0, "Yellow": 1, "Green": 2}
 
-    # Second pass: draw everything
-    for x1, y1, x2, y2, score in detections:
-        crop = img[y1:y2, x1:x2]
-        signal_state = infer_light_colour(crop)
+    # convert predictions to supervision format
+    xyxy = []
+    confidences = []
+    class_ids = []
 
-        # Normal traffic lights
-        if signal_state == 'red':
-          color = (0, 0, 255)
-        elif signal_state == 'amber':
-          color = (0, 126, 255)
-        elif signal_state == 'green':
-          color = (0, 255, 0)
-        else:
-          color = (255, 255, 255)
-        thickness = 2
-        label = f"{signal_state} {score:.2f}"
-        
-        if (x1, y1, x2, y2, score) == best_det:
-            # ACTIVE traffic light, yellow highlight
-            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 255), 6)
-            label = f"ACTIVE {signal_state} {score:.2f}"
+    for pred in preds:
+        x = pred["x"]
+        y = pred["y"]
+        w = pred["width"]
+        h = pred["height"]
+        conf = pred["confidence"]
+        cls = pred["class"]
 
-        cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
-        cv2.putText(
-            img,
-            label,
-            (x1, y1 - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            color,
-            2
-        )
+        x1 = int(x - w/2)
+        y1 = int(y - h/2)
+        x2 = int(x + w/2)
+        y2 = int(y + h/2)
 
-    return img
+        xyxy.append([x1, y1, x2, y2])
+        confidences.append(conf)
+        class_ids.append(class_name_to_idx[cls])
 
+    detections = sv.Detections(
+        xyxy=np.array(xyxy),
+        confidence=np.array(confidences),
+        class_id=np.array(class_ids)
+    )
+
+    label_annotator = sv.LabelAnnotator()
+    annotated_frame = label_annotator.annotate(scene=img, detections=detections)
+    return annotated_frame
 
 # Route to handle uploaded images
 @app.route('/detect', methods=['POST'])
@@ -134,7 +131,7 @@ def detect():
 
 @app.route('/detect_video', methods=['GET'])
 def detect_video():
-    for i in range(5, 15):
+    for i in range(15, 16):
         input_path = f"test_videos/tv{i}.mp4"
         output_path = f"result{i}.mp4"
 
