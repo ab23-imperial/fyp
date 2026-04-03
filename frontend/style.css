@@ -1,10 +1,34 @@
 #container {
   position: relative;
-  width: min(90vw, 500px);     /* scales with screen, caps on desktop */
-  aspect-ratio: 1 / 2;         /* keeps your 600x1200 proportion */
-  margin: 20px auto;
+  width: 100vw;
+  height: 100dvh;   /* 👈 real full screen, fixes iPhone Safari */
   overflow: hidden;
   background: black;
+}
+
+#hud {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  padding-top: env(safe-area-inset-top); /* notch safe */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+#advice {
+  margin-top: 10px;
+  font-size: clamp(18px, 8vw, 45px);
+  font-weight: bold;
+  text-align: center;
+}
+
+#text {
+  margin-top: 5px;
+  font-size: clamp(14px, 6vw, 45px);
+  opacity: 0.85;
+  text-align: center;
 }
 
 /* ROAD (cover + crop like OpenCV) */
@@ -13,7 +37,7 @@
   width: 100%;
   height: 150%;
   object-fit: cover;
-  top: -30%;   /* matches offset_ratio ≈ 0.3 */
+  top: -30%;
 }
 
 /* SIGNAL WINDOW */
@@ -21,7 +45,7 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  width: 60%;
+  width: 65%;          /* relative now */
   top: 0;
   bottom: 0;
   display: flex;
@@ -44,14 +68,14 @@
 /* CAR */
 #car {
   position: absolute;
-  width: 20%;
+  width: 18%;
   height: auto;
   left: 50%;
   transform: translateX(-50%);
-  transition: top 0.2s linear;  /* smooth movement */
+  transition: top 0.2s linear;
 }
 
-#advice {
+/* #advice {
   margin-top: 20px;
   font-size: 22px;
   font-weight: bold;
@@ -64,9 +88,13 @@
   font-size: 16px;
   text-align: center;
   width: 100%;
-}
+} */
 
-body {
+html, body {
   margin: 0;
-  padding: 10px;
+  padding: 0;
+  height: 100%;
+  background: black;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
 }
