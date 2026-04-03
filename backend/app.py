@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory
-from core import step_logic_only
+from core import step_core
+from collections import deque
 import time
 
 app = Flask(__name__, static_folder="../frontend")
@@ -10,9 +11,11 @@ state = {
     "current_phase": None,
     "phase_start_time": None,
     "last_update_time": time.time(),
+    "last_report_time": 0,
+    "mri": 0,
 }
 
-state_buffer = []
+state_buffer = deque(maxlen=5)
 phase_reports = {}
 
 # serve index.html
@@ -29,11 +32,12 @@ def static_files(path):
 def gps():
     data = request.json
 
-    result = step_logic_only(
+    result = step_core(
         state,
         state_buffer,
         phase_reports,
-        data
+        speed=data.get("speed", 5),
+        use_vision=False,
     )
 
     return jsonify(result)
