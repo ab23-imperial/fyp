@@ -1,68 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="stylesheet" href="/style.css">
   <title>Signal Advisory</title>
-  <style>
-    body {
-      margin: 0;
-      background: #111;
-      color: white;
-      font-family: Arial;
-      text-align: center;
-    }
-
-    #container {
-      position: relative;
-      width: 300px;
-      height: 600px;
-      margin: 40px auto;
-      background: #222;
-      overflow: hidden;
-    }
-
-    #bar {
-      position: absolute;
-      width: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      top: 0;
-      bottom: 0;
-    }
-
-    .segment {
-      width: 100%;
-    }
-
-    #red1 { background: red; }
-    #green { background: green; }
-    #red2 { background: red; }
-
-    #car {
-      position: absolute;
-      width: 40px;
-      height: 60px;
-      background: white;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    #text {
-      margin-top: 20px;
-    }
-  </style>
 </head>
 <body>
 
 <h2 id="advice">Loading...</h2>
 
 <div id="container">
-  <div id="bar">
+  <img id="road" src="/ui/lib/road2.png" />
+
+  <div id="overlay">
     <div id="red1" class="segment"></div>
     <div id="green" class="segment"></div>
     <div id="red2" class="segment"></div>
   </div>
 
-  <div id="car"></div>
+  <img id="car" src="/ui/lib/car.png" />
 </div>
 
 <div id="text"></div>

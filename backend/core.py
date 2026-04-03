@@ -264,79 +264,6 @@ def step_simulation(
     }
 
     return True, state, output, mri, frame
-  
-def step_logic_only(state, state_buffer, phase_reports, gps):
-    now = time.time()
-    dt = now - state["last_update_time"]
-    state["last_update_time"] = now
-
-    # --- Motion ---
-    speed = gps.get("speed", 5.0)
-
-    state["sim_distance"] = max(0, state["sim_distance"] - speed * dt)
-    distance = state["sim_distance"]
-    arrival_time = distance / max(speed, 0.1)
-
-    # --- Vision placeholder ---
-    vision_phase = "green"   # temporary
-
-    # --- Phase estimation ---
-    layer2_phase = get_consensus_phase(
-        distance, vision_phase, phase_reports
-    )
-
-    if (
-        layer2_phase in {"green", "amber", "red"}
-        and layer2_phase != state["current_phase"]
-    ):
-        state["current_phase"] = layer2_phase
-        state["phase_start_time"] = now
-
-    # --- Temporal model (IDENTICAL to simulation) ---
-    T_g = None
-    window_index = None
-    delta_start = None
-    delta_end = None
-    phase_position = None
-
-    if state["current_phase"] and state["phase_start_time"]:
-        t_in_phase = now - state["phase_start_time"]
-
-        T_g = compute_time_to_next_green(
-            state["current_phase"], t_in_phase
-        )
-
-        window_index, delta_start, delta_end = classify_arrival(
-            arrival_time, T_g
-        )
-
-        if T_g is not None:
-            phase_position = (arrival_time - T_g) % CYCLE_DURATION
-
-    advice = advisory_from_delta(delta_start, delta_end)
-
-    # --- Debug (same richness as sim) ---
-    print(
-        f"dist={distance:.1f}m | "
-        f"arr={arrival_time:.2f}s | "
-        f"Tg={T_g} | "
-        f"win={window_index} | "
-        f"Δstart={delta_start} | "
-        f"Δend={delta_end} | "
-        f"{state['current_phase']} | "
-        f"{advice}"
-    )
-
-    return {
-        "advice": advice,
-        "distance": distance,
-        "eta": arrival_time,
-        "phase": state["current_phase"],
-        "window_index": window_index,
-        "delta_start": delta_start,
-        "delta_end": delta_end,
-        "phase_position": phase_position,
-    }
     
 def step_core(
     state,
@@ -463,7 +390,7 @@ def main():
   gps = {"lat": 19.0, "lon": 72.0, "speed": 5}
 
   for _ in range(5):
-      result = step_logic_only(state, state_buffer, phase_reports, gps)
+      result = step_core(state, state_buffer, phase_reports, gps)
       print(result)
       time.sleep(1)
   
