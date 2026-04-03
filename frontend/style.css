@@ -1,47 +1,72 @@
+#container {
+  position: relative;
+  width: min(90vw, 500px);     /* scales with screen, caps on desktop */
+  aspect-ratio: 1 / 2;         /* keeps your 600x1200 proportion */
+  margin: 20px auto;
+  overflow: hidden;
+  background: black;
+}
+
+/* ROAD (cover + crop like OpenCV) */
+#road {
+  position: absolute;
+  width: 100%;
+  height: 150%;
+  object-fit: cover;
+  top: -30%;   /* matches offset_ratio ≈ 0.3 */
+}
+
+/* SIGNAL WINDOW */
+#overlay {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  opacity: 0.4;
+}
+
+.segment {
+  width: 100%;
+}
+
+#red1, #red2 {
+  background: red;
+}
+
+#green {
+  background: green;
+}
+
+/* CAR */
+#car {
+  position: absolute;
+  width: 20%;
+  height: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: top 0.2s linear;  /* smooth movement */
+}
+
+#advice {
+  margin-top: 20px;
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+  width: 100%;
+}
+
+#text {
+  margin-top: 10px;
+  font-size: 16px;
+  text-align: center;
+  width: 100%;
+}
+
 body {
   margin: 0;
-  font-family: sans-serif;
-}
-
-#map {
-  width: 100vw;
-  height: 100vh;
-}
-
-#controls {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: white;
   padding: 10px;
-  z-index: 1;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-#info {
-  margin-top: 8px;
-}
-
-.leaflet-div-icon {
-  background: transparent !important;
-  border: none !important;
-}
-
-.distance-label {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-
-  background: rgba(0, 0, 0, 0.75);
-  color: #ffffff;
-
-  padding: 4px 8px;
-  border-radius: 6px;
-
-  white-space: nowrap;
-  pointer-events: none;
-
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.35);
 }
