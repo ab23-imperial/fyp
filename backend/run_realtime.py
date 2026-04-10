@@ -4,7 +4,7 @@ from collections import deque, Counter
 
 from vision.detector import detect_signal
 from ui.simple_ui import SignalUI
-from core import step_simulation
+from old_core import step_simulation
 
 # -------------------------
 # CONFIGURATION

@@ -1,19 +1,31 @@
 from flask import Flask, request, jsonify, send_from_directory
-from core import step_core
+from core import step_core, SIGNALS
 from collections import deque
 import time
+import cv2
+
+from core import detect_signal, stable_state
+
+cap = cv2.VideoCapture("test_videos/tv1.mp4")
+video_fps = cap.get(cv2.CAP_PROP_FPS)
+start_wall = time.time()
+
+state_buffer = deque(maxlen=5)
+last_sample_time = 0.0
 
 app = Flask(__name__, static_folder="../frontend")
 
 # persistent state
 state = {
-    "sim_distance": 100,
+    "sim_distance": SIGNALS[0]["distance"],
+    "current_signal_idx": 0,
     "current_phase": None,
     "phase_start_time": None,
     "last_update_time": time.time(),
     "last_report_time": 0,
     "mri": 0,
 }
+state["start_wall"] = start_wall
 
 state_buffer = deque(maxlen=5)
 phase_reports = {}
@@ -32,12 +44,26 @@ def static_files(path):
 def gps():
     data = request.json
 
+    now = time.time()
+    elapsed = now - start_wall
+
+    # --- FRAME SYNC (same as old system) ---
+    frame_idx = int(elapsed * video_fps)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+
+    ret, frame = cap.read()
+    if not ret:
+        frame = None
+
     result = step_core(
         state,
         state_buffer,
         phase_reports,
-        speed=data.get("speed", 5),
-        use_vision=False,
+        now=now,
+        speed=data.get("speed", 12.5),
+        frame=frame,
+        use_vision=True,   # 👈 TURNED ON
+        do_mock_reports=False
     )
 
     return jsonify(result)

@@ -15,16 +15,20 @@ DETECT_INTERVAL = 0.1
 SIM_SPEED = 12
 SIM_INITIAL_DISTANCE = 120
 
-GREEN_DURATION = 8
+SIGNALS = [
+    {"id": 1, "distance": 120, "green": 2, "amber": 2, "red": 6},
+    {"id": 2, "distance": 180, "green": 5, "amber": 2, "red": 8},
+    {"id": 3, "distance": 90,  "green": 3, "amber": 1, "red": 5},
+]
+
+GREEN_DURATION = 2
 AMBER_DURATION = 2
-RED_DURATION = 4
+RED_DURATION = 6
 
 VIDEO_PATH = "test_videos/tv1.mp4"
 VISION_RANGE_THRESHOLD = 50.0
 
 MOCK_REPORTS = ["red", "green", "red", "green"]
-
-CYCLE_DURATION = GREEN_DURATION + AMBER_DURATION + RED_DURATION
 
 # -------------------------
 # INITIALIZATION
@@ -55,6 +59,9 @@ last_sample_time = 0.0
 # HELPERS
 # -------------------------
 
+def get_current_signal(state):
+    return SIGNALS[state["current_signal_idx"]]
+  
 def stable_state(buffer):
     valid = [s for s in buffer if s != "unknown"]
     if not valid:
@@ -62,39 +69,37 @@ def stable_state(buffer):
     return Counter(valid).most_common(1)[0][0]
 
 
-def phase_duration(phase):
+def phase_duration(phase, signal):
     if phase == "green":
-        return GREEN_DURATION
+        return signal["green"]
     if phase == "amber":
-        return AMBER_DURATION
+        return signal["amber"]
     if phase == "red":
-        return RED_DURATION
+        return signal["red"]
     return None
 
-
-def compute_time_to_next_green(phase, t_in_phase):
+def compute_time_to_next_green(phase, t_in_phase, signal):
     if phase == "green":
         return -t_in_phase
     if phase == "amber":
-        return AMBER_DURATION - t_in_phase
+        return signal["amber"] - t_in_phase
     if phase == "red":
-        return RED_DURATION - t_in_phase
+        return signal["red"] - t_in_phase
     return None
 
-
-def add_phase_report(phase_reports, phase):
+def add_phase_report(phase_reports, phase, signal):
     ts = time.time()
-    phase_reports[ts] = (ts, phase, phase_duration(phase))
+    phase_reports[ts] = (ts, phase, phase_duration(phase, signal))
 
 
-def generate_mock_reports(phase_reports, last_report_time, mri, interval=2.5):
+def generate_mock_reports(phase_reports, last_report_time, mri, signal, interval=2.5):
     now = time.time()
     if now - last_report_time < interval:
         return last_report_time, mri
 
     phase = MOCK_REPORTS[mri]
     mri = (mri + 1) % len(MOCK_REPORTS)
-    add_phase_report(phase_reports, phase)
+    add_phase_report(phase_reports, phase, signal)
 
     print(f"REPORTED: {phase}")
     return now, mri
@@ -126,18 +131,21 @@ def get_consensus_phase(distance, vision_phase, phase_reports):
     return max(scores, key=scores.get)
 
 
-def classify_arrival(arrival_time, T_g):
+def classify_arrival(arrival_time, T_g, signal):
     if T_g is None:
         return None, None, None
 
+    cycle = signal["green"] + signal["amber"] + signal["red"]
+    phase_position = (arrival_time - T_g) % cycle
+
     if arrival_time < T_g:
         green_start = T_g
-        green_end = green_start + GREEN_DURATION
+        green_end = green_start + signal["green"]
         return 0, arrival_time - green_start, arrival_time - green_end
 
-    cycles = int((arrival_time - T_g) // CYCLE_DURATION)
-    green_start = T_g + cycles * CYCLE_DURATION
-    green_end = green_start + GREEN_DURATION
+    cycles = int((arrival_time - T_g) // cycle)
+    green_start = T_g + cycles * cycle
+    green_end = green_start + signal["green"]
 
     return cycles, arrival_time - green_start, arrival_time - green_end
 
@@ -150,120 +158,6 @@ def advisory_from_delta(delta_to_start, delta_to_end):
     if delta_to_end <= 0:
         return "arrive_during_green"
     return "arrive_after_green"
-
-def step_simulation(
-    start_wall: float,
-    state: dict,
-    cap,
-    video_fps: float,
-    total_frames: int,
-    state_buffer: list,
-    phase_reports: list,
-    mri,
-):
-    elapsed_wall = time.time() - start_wall
-
-    # --- Frame control ---
-    frame_idx = int(elapsed_wall * video_fps)
-    if frame_idx >= total_frames:
-        return False, state, None
-
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-    ret, frame = cap.read()
-    if not ret:
-        return False, state, None
-
-    # --- Detection ---
-    if elapsed_wall - state["last_sample_time"] >= DETECT_INTERVAL:
-        state["last_sample_time"] = elapsed_wall
-        _, buf = cv2.imencode(".jpg", frame)
-        result = detect_signal(buf.tobytes())
-        state_buffer.append(result.state)
-
-    # --- External reports ---
-    state["last_report_time"], mri = generate_mock_reports(
-        phase_reports, state["last_report_time"], mri
-    )
-    remove_expired_reports(phase_reports)
-
-    # --- Phase estimation ---
-    vision_phase = stable_state(state_buffer)
-    layer2_phase = get_consensus_phase(
-        state["sim_distance"], vision_phase, phase_reports
-    )
-
-    if (
-        layer2_phase in {"green", "amber", "red"}
-        and layer2_phase != state["current_phase"]
-    ):
-        state["current_phase"] = layer2_phase
-        state["phase_start_time"] = elapsed_wall
-        print(f"Phase changed to {state['current_phase']}")
-
-    # --- Vehicle motion ---
-    dt = elapsed_wall - state["prev_wall"]
-    state["prev_wall"] = elapsed_wall
-
-    state["sim_distance"] = max(
-        0.0, state["sim_distance"] - SIM_SPEED * dt
-    )
-    arrival_time = (
-        state["sim_distance"] / SIM_SPEED if SIM_SPEED > 0 else float("inf")
-    )
-
-    # --- Temporal model ---
-    T_g = None
-    window_index = None
-    delta_start = None
-    delta_end = None
-    phase_position = None
-
-    if (
-        state["current_phase"] is not None
-        and state["phase_start_time"] is not None
-    ):
-        t_in_phase = elapsed_wall - state["phase_start_time"]
-        T_g = compute_time_to_next_green(
-            state["current_phase"], t_in_phase
-        )
-
-        window_index, delta_start, delta_end = classify_arrival(
-            arrival_time, T_g
-        )
-
-        if T_g is not None:
-            phase_position = (arrival_time - T_g) % CYCLE_DURATION
-
-    advice = advisory_from_delta(delta_start, delta_end)
-
-    # --- Debug ---
-    print(
-        f"dist={state['sim_distance']:.1f}m | "
-        f"arr={arrival_time:.2f}s | "
-        f"Tg={T_g if T_g is not None else 'None'} | "
-        f"win={window_index} | "
-        f"Δstart={delta_start} | "
-        f"Δend={delta_end} | "
-        f"{state['current_phase']} | "
-        f"{advice}"
-    )
-
-    # --- Output payload ---
-    output = {
-        "advice": advice,
-        "window_index": window_index,
-        "delta_start": delta_start,
-        "distance": state["sim_distance"],
-        "eta": arrival_time,
-        "phase_position": phase_position,
-        "green_dur": GREEN_DURATION,
-        "amber_dur": AMBER_DURATION,
-        "red_dur": RED_DURATION,
-        "red_before_dur": RED_DURATION,
-        "red_after_dur": RED_DURATION,
-    }
-
-    return True, state, output, mri, frame
     
 def step_core(
     state,
@@ -274,6 +168,7 @@ def step_core(
     speed=None,
     frame=None,
     use_vision=False,
+    do_mock_reports=True
 ):
     if now is None:
         now = time.time()
@@ -287,7 +182,31 @@ def step_core(
         speed = SIM_SPEED
 
     state["sim_distance"] = max(0, state["sim_distance"] - speed * dt)
+    
+    # ---------------- SIGNAL TRANSITION ----------------
+    if state["sim_distance"] <= 0:
+      state["current_signal_idx"] += 1
+
+      if state["current_signal_idx"] >= len(SIGNALS):
+          # loop for now
+          state["current_signal_idx"] = 0
+
+      next_signal = SIGNALS[state["current_signal_idx"]]
+
+      # reset for next signal
+      state["sim_distance"] = next_signal["distance"]
+      state["current_phase"] = None
+      state["phase_start_time"] = None
+
+      state_buffer.clear()
+      phase_reports.clear()
+      state["last_report_time"] = 0
+      state["mri"] = 0
+
+      print(f"\n--- Switched to signal {next_signal['id']} ---\n")
+      
     distance = state["sim_distance"]
+    signal = get_current_signal(state)
     arrival_time = distance / max(speed, 0.1)
 
     # ---------------- VISION ----------------
@@ -306,13 +225,15 @@ def step_core(
         vision_phase = "green"
 
     # ---------------- REPORTS ----------------
-    state["last_report_time"], state["mri"] = generate_mock_reports(
-        phase_reports,
-        state.get("last_report_time", 0),
-        state.get("mri", 0),
-    )
+    if do_mock_reports:
+      state["last_report_time"], state["mri"] = generate_mock_reports(
+          phase_reports,
+          state.get("last_report_time", 0),
+          state.get("mri", 0),
+          signal
+      )
 
-    remove_expired_reports(phase_reports)
+      remove_expired_reports(phase_reports)
 
     # ---------------- PHASE ESTIMATION ----------------
     layer2_phase = get_consensus_phase(
@@ -337,15 +258,16 @@ def step_core(
         t_in_phase = now - state["phase_start_time"]
 
         T_g = compute_time_to_next_green(
-            state["current_phase"], t_in_phase
+            state["current_phase"], t_in_phase, signal
         )
 
         window_index, delta_start, delta_end = classify_arrival(
-            arrival_time, T_g
+            arrival_time, T_g, signal
         )
 
         if T_g is not None:
-            phase_position = (arrival_time - T_g) % CYCLE_DURATION
+            cycle = signal["green"] + signal["amber"] + signal["red"]
+            phase_position = (arrival_time - T_g) % cycle
 
     advice = advisory_from_delta(delta_start, delta_end)
 
@@ -370,18 +292,22 @@ def step_core(
         "delta_start": delta_start,
         "delta_end": delta_end,
         "phase_position": phase_position,
-        "green_dur": GREEN_DURATION,
-        "amber_dur": AMBER_DURATION,
-        "red_dur": RED_DURATION,
-        "red_before_dur": RED_DURATION,
-        "red_after_dur": RED_DURATION,
+        "green_dur": signal["green"],
+        "amber_dur": signal["amber"],
+        "red_dur": signal["red"],
+        "red_before_dur": signal["red"],
+        "red_after_dur": signal["red"],
     }
     
 def main():
   state = {
-      "sim_distance": 100,
-      "current_phase": None,
-      "phase_start_time": None,
+    "sim_distance": SIGNALS[0]["distance"],
+    "current_signal_idx": 0,
+    "current_phase": None,
+    "phase_start_time": None,
+    "last_update_time": time.time(),
+    "last_report_time": 0,
+    "mri": 0,
   }
 
   state_buffer = []
@@ -390,7 +316,12 @@ def main():
   gps = {"lat": 19.0, "lon": 72.0, "speed": 5}
 
   for _ in range(5):
-      result = step_core(state, state_buffer, phase_reports, gps)
+      result = step_core(
+        state,
+        state_buffer,
+        phase_reports,
+        speed=gps["speed"]
+      )
       print(result)
       time.sleep(1)
   
