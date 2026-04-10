@@ -40,17 +40,23 @@
   top: -30%;
 }
 
-/* SIGNAL WINDOW */
 #overlay {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  width: 65%;          /* relative now */
+  width: 65%;
   top: 0;
   bottom: 0;
-  display: flex;
-  flex-direction: column;
-  opacity: 0.4;
+  opacity: 0.5;
+
+  background: linear-gradient(
+    to bottom,
+    red 0%,
+    orange 20%,
+    green 45%,
+    orange 70%,
+    red 100%
+  );
 }
 
 .segment {
