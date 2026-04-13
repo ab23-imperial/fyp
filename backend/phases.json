@@ -1,0 +1,97 @@
+[
+  {
+    "signal_id": 1,
+    "phase": "red",
+    "timestamp": 1776069361.604308
+  },
+  {
+    "signal_id": 1,
+    "phase": "amber",
+    "timestamp": 1776069365.254387
+  },
+  {
+    "signal_id": 1,
+    "phase": "red",
+    "timestamp": 1776069365.8524292
+  },
+  {
+    "signal_id": 1,
+    "phase": "amber",
+    "timestamp": 1776069368.632502
+  },
+  {
+    "signal_id": 1,
+    "phase": "red",
+    "timestamp": 1776069368.939859
+  },
+  {
+    "signal_id": 1,
+    "phase": "green",
+    "timestamp": 1776069370.035576
+  },
+  {
+    "signal_id": 2,
+    "phase": "red",
+    "timestamp": 1776069371.1448672
+  },
+  {
+    "signal_id": 2,
+    "phase": "green",
+    "timestamp": 1776069375.2683861
+  },
+  {
+    "signal_id": 2,
+    "phase": "amber",
+    "timestamp": 1776069380.209242
+  },
+  {
+    "signal_id": 2,
+    "phase": "red",
+    "timestamp": 1776069382.134531
+  },
+  {
+    "signal_id": 3,
+    "phase": "red",
+    "timestamp": 1776069385.6735659
+  },
+  {
+    "signal_id": 3,
+    "phase": "green",
+    "timestamp": 1776069387.050347
+  },
+  {
+    "signal_id": 3,
+    "phase": "amber",
+    "timestamp": 1776069390.0575879
+  },
+  {
+    "signal_id": 3,
+    "phase": "red",
+    "timestamp": 1776069391.1532679
+  },
+  {
+    "signal_id": 1,
+    "phase": "amber",
+    "timestamp": 1776069393.077802
+  },
+  {
+    "signal_id": 1,
+    "phase": "red",
+    "timestamp": 1776069394.196975
+  },
+  {
+    "signal_id": 1,
+    "phase": "green",
+    "timestamp": 1776069400.122533
+  },
+  {
+    "signal_id": 1,
+    "phase": "amber",
+    "timestamp": 1776069402.027005
+  },
+  {
+    "signal_id": 2,
+    "phase": "red",
+    "timestamp": 1776069402.844485
+  }
+]
