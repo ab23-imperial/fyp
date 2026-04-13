@@ -5,6 +5,7 @@ import time
 import cv2
 
 from core import detect_signal, stable_state
+from phase_logger import PhaseLogger
 
 cap = cv2.VideoCapture("test_videos/tv1.mp4")
 video_fps = cap.get(cv2.CAP_PROP_FPS)
@@ -15,6 +16,8 @@ last_sample_time = 0.0
 
 app = Flask(__name__, static_folder="../frontend")
 
+logger = PhaseLogger()
+
 # persistent state
 state = {
     "sim_distance": SIGNALS[0]["distance"],
@@ -24,6 +27,8 @@ state = {
     "last_update_time": time.time(),
     "last_report_time": 0,
     "mri": 0,
+    "true_phase_memory": {},
+    "signal_start_time": time.time(),
 }
 state["start_wall"] = start_wall
 
@@ -54,16 +59,19 @@ def gps():
     ret, frame = cap.read()
     if not ret:
         frame = None
-
+        
     result = step_core(
         state,
         state_buffer,
         phase_reports,
         now=now,
         speed=data.get("speed", 12.5),
+        lat=data.get("lat"),
+        lon=data.get("lon"),
         frame=frame,
         use_vision=True,   # 👈 TURNED ON
-        do_mock_reports=False
+        do_mock_reports=False,
+        logger=logger
     )
 
     return jsonify(result)

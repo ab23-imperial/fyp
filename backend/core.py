@@ -1,9 +1,11 @@
 import time
 import cv2
 from collections import deque, Counter
+import math
 
 from vision.detector import detect_signal
 from ui.simple_ui import SignalUI
+from phase_logger import PhaseLogger
 
 # -------------------------
 # CONFIGURATION
@@ -15,10 +17,15 @@ DETECT_INTERVAL = 0.1
 SIM_SPEED = 12
 SIM_INITIAL_DISTANCE = 120
 
+# SIGNALS = [
+#     {"id": 1, "distance": 120, "green": 2, "amber": 2, "red": 6},
+#     {"id": 2, "distance": 180, "green": 5, "amber": 2, "red": 8},
+#     {"id": 3, "distance": 90,  "green": 3, "amber": 1, "red": 5},
+# ]
+
 SIGNALS = [
-    {"id": 1, "distance": 120, "green": 2, "amber": 2, "red": 6},
-    {"id": 2, "distance": 180, "green": 5, "amber": 2, "red": 8},
-    {"id": 3, "distance": 90,  "green": 3, "amber": 1, "red": 5},
+    {"id": 1, "lat": 19.006304427054125, "lon": 72.82317790283602, "green": 2, "amber": 2, "red": 6},
+    {"id": 2, "lat": 19.0063103622219, "lon": 72.8181054726819, "green": 5, "amber": 2, "red": 8},
 ]
 
 GREEN_DURATION = 2
@@ -59,8 +66,31 @@ last_sample_time = 0.0
 # HELPERS
 # -------------------------
 
-def get_current_signal(state):
-    return SIGNALS[state["current_signal_idx"]]
+def get_true_phase(signal, t):
+    cycle = signal["green"] + signal["amber"] + signal["red"]
+    t_mod = t % cycle
+
+    if t_mod < signal["green"]:
+        return "green"
+    elif t_mod < signal["green"] + signal["amber"]:
+        return "amber"
+    else:
+        return "red"
+      
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+
+    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
+    return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+def get_nearest_signal(lat, lon):
+    return min(
+        SIGNALS,
+        key=lambda s: haversine(lat, lon, s["lat"], s["lon"])
+    )
   
 def stable_state(buffer):
     valid = [s for s in buffer if s != "unknown"]
@@ -91,18 +121,34 @@ def add_phase_report(phase_reports, phase, signal):
     ts = time.time()
     phase_reports[ts] = (ts, phase, phase_duration(phase, signal))
 
+# def generate_mock_reports(phase_reports, last_report_time, mri, signal, interval=2.5):
+#     now = time.time()
+#     if now - last_report_time < interval:
+#         return last_report_time, mri
 
-def generate_mock_reports(phase_reports, last_report_time, mri, signal, interval=2.5):
-    now = time.time()
-    if now - last_report_time < interval:
-        return last_report_time, mri
+#     phase = get_true_phase(signal, now)
+#     # mri = (mri + 1) % len(MOCK_REPORTS)
+#     add_phase_report(phase_reports, phase, signal)
 
-    phase = MOCK_REPORTS[mri]
-    mri = (mri + 1) % len(MOCK_REPORTS)
-    add_phase_report(phase_reports, phase, signal)
+#     print(f"REPORTED: {phase}")
+#     return now, mri
+  
+def generate_mock_reports(state, phase_reports, signal, now):
+    signal_id = signal["id"]
 
-    print(f"REPORTED: {phase}")
-    return now, mri
+    # get true phase from simulation
+    t = now - state["signal_start_time"]
+    true_phase = get_true_phase(signal, t)
+
+    # get last phase for THIS signal
+    last_phase = state["true_phase_memory"].get(signal_id)
+
+    # only report on transition
+    if true_phase != last_phase:
+        add_phase_report(phase_reports, true_phase, signal)
+        state["true_phase_memory"][signal_id] = true_phase
+
+        print(f"REPORTED (transition): {signal_id} → {true_phase}")
 
 
 def remove_expired_reports(phase_reports):
@@ -164,18 +210,25 @@ def step_core(
     state_buffer,
     phase_reports,
     *,
+    lat=None,
+    lon=None,
     now=None,
     speed=None,
     frame=None,
     use_vision=False,
-    do_mock_reports=True
+    do_mock_reports=True,
+    logger=None
 ):
+    if logger is None:
+        logger = PhaseLogger()
     if now is None:
         now = time.time()
 
     # ---------------- TIME ----------------
     dt = now - state.get("last_update_time", now)
     state["last_update_time"] = now
+    
+    signal = get_nearest_signal(lat, lon)
 
     # ---------------- MOTION ----------------
     if speed is None:
@@ -184,29 +237,43 @@ def step_core(
     state["sim_distance"] = max(0, state["sim_distance"] - speed * dt)
     
     # ---------------- SIGNAL TRANSITION ----------------
-    if state["sim_distance"] <= 0:
-      state["current_signal_idx"] += 1
-
-      if state["current_signal_idx"] >= len(SIGNALS):
-          # loop for now
-          state["current_signal_idx"] = 0
-
-      next_signal = SIGNALS[state["current_signal_idx"]]
-
-      # reset for next signal
-      state["sim_distance"] = next_signal["distance"]
+    if signal["id"] != state.get("current_signal_id"):
+      state["current_signal_id"] = signal["id"]
+      state["signal_start_time"] = now
       state["current_phase"] = None
       state["phase_start_time"] = None
 
       state_buffer.clear()
       phase_reports.clear()
-      state["last_report_time"] = 0
-      state["mri"] = 0
 
-      print(f"\n--- Switched to signal {next_signal['id']} ---\n")
+      print(f"\n--- Switched to signal {signal['id']} ---\n")
+    # if state["sim_distance"] <= 0:
+    #   state["current_signal_idx"] += 1
+
+    #   if state["current_signal_idx"] >= len(SIGNALS):
+    #       # loop for now
+    #       state["current_signal_idx"] = 0
+
+    #   next_signal = SIGNALS[state["current_signal_idx"]]
+
+    #   # reset for next signal
+    #   state["sim_distance"] = next_signal["distance"]
+    #   state["current_phase"] = None
+    #   state["phase_start_time"] = None
+
+    #   state_buffer.clear()
+    #   phase_reports.clear()
+    #   state["last_report_time"] = 0
+    #   state["mri"] = 0
+    #   state["signal_start_time"] = now
+
+    #   print(f"\n--- Switched to signal {next_signal['id']} ---\n")
       
-    distance = state["sim_distance"]
-    signal = get_current_signal(state)
+    # distance = state["sim_distance"]
+    distance = haversine(
+        lat, lon,
+        signal["lat"], signal["lon"]
+    )
     arrival_time = distance / max(speed, 0.1)
 
     # ---------------- VISION ----------------
@@ -222,16 +289,12 @@ def step_core(
         vision_phase = stable_state(state_buffer)
     else:
         # fallback (can swap to random later)
-        vision_phase = "green"
+        t = now - state["signal_start_time"]
+        vision_phase = get_true_phase(signal, t)
 
     # ---------------- REPORTS ----------------
     if do_mock_reports:
-      state["last_report_time"], state["mri"] = generate_mock_reports(
-          phase_reports,
-          state.get("last_report_time", 0),
-          state.get("mri", 0),
-          signal
-      )
+      generate_mock_reports(state, phase_reports, signal, now)
 
       remove_expired_reports(phase_reports)
 
@@ -246,6 +309,12 @@ def step_core(
     ):
         state["current_phase"] = layer2_phase
         state["phase_start_time"] = now
+
+        logger.log(
+            signal_id=signal["id"],
+            phase=layer2_phase,
+            timestamp=now
+        )
 
     # ---------------- TEMPORAL MODEL ----------------
     T_g = None
@@ -299,31 +368,33 @@ def step_core(
         "red_after_dur": signal["red"],
     }
     
-def main():
-  state = {
-    "sim_distance": SIGNALS[0]["distance"],
-    "current_signal_idx": 0,
-    "current_phase": None,
-    "phase_start_time": None,
-    "last_update_time": time.time(),
-    "last_report_time": 0,
-    "mri": 0,
-  }
+# def main():
+#   logger = PhaseLogger()
+#   state = {
+#     "sim_distance": SIGNALS[0]["distance"],
+#     "current_signal_idx": 0,
+#     "current_phase": None,
+#     "phase_start_time": None,
+#     "last_update_time": time.time(),
+#     "last_report_time": 0,
+#     "mri": 0,
+#   }
 
-  state_buffer = []
-  phase_reports = {}
+#   state_buffer = []
+#   phase_reports = {}
 
-  gps = {"lat": 19.0, "lon": 72.0, "speed": 5}
+#   gps = {"lat": 19.0, "lon": 72.0, "speed": 5}
 
-  for _ in range(5):
-      result = step_core(
-        state,
-        state_buffer,
-        phase_reports,
-        speed=gps["speed"]
-      )
-      print(result)
-      time.sleep(1)
+#   for _ in range(5):
+#       result = step_core(
+#         state,
+#         state_buffer,
+#         phase_reports,
+#         speed=gps["speed"],
+#         logger=logger
+#       )
+#       print(result)
+#       time.sleep(1)
   
-if __name__ == "__main__":
-  main()
+# if __name__ == "__main__":
+#   main()
