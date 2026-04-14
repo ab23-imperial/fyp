@@ -33,7 +33,7 @@ AMBER_DURATION = 2
 RED_DURATION = 6
 
 VIDEO_PATH = "test_videos/tv1.mp4"
-VISION_RANGE_THRESHOLD = 50.0
+VISION_RANGE_THRESHOLD = 5000
 
 MOCK_REPORTS = ["red", "green", "red", "green"]
 
@@ -110,12 +110,18 @@ def phase_duration(phase, signal):
 
 def compute_time_to_next_green(phase, t_in_phase, signal):
     if phase == "green":
-        return -t_in_phase
+        return (
+            signal["green"] - t_in_phase +   # finish current green
+            signal["amber"] +                # amber
+            signal["red"]                   # red
+        )
     if phase == "amber":
-        return signal["amber"] - t_in_phase
+        return (
+            signal["amber"] - t_in_phase +
+            signal["red"]
+        )
     if phase == "red":
         return signal["red"] - t_in_phase
-    return None
 
 def add_phase_report(phase_reports, phase, signal):
     ts = time.time()
@@ -233,8 +239,6 @@ def step_core(
     # ---------------- MOTION ----------------
     if speed is None:
         speed = SIM_SPEED
-
-    state["sim_distance"] = max(0, state["sim_distance"] - speed * dt)
     
     # ---------------- SIGNAL TRANSITION ----------------
     if signal["id"] != state.get("current_signal_id"):
@@ -270,6 +274,7 @@ def step_core(
     #   print(f"\n--- Switched to signal {next_signal['id']} ---\n")
       
     # distance = state["sim_distance"]
+    # print(f"dist betw ({lat}, {lon}) and ({signal["lat"]}, {signal["lon"]})")
     distance = haversine(
         lat, lon,
         signal["lat"], signal["lon"]
@@ -324,19 +329,45 @@ def step_core(
     phase_position = None
 
     if state.get("current_phase") and state.get("phase_start_time"):
-        t_in_phase = now - state["phase_start_time"]
+        t = now - state["signal_start_time"]
 
-        T_g = compute_time_to_next_green(
-            state["current_phase"], t_in_phase, signal
-        )
+        cycle = signal["green"] + signal["amber"] + signal["red"]
+        t_mod = t % cycle
 
-        window_index, delta_start, delta_end = classify_arrival(
-            arrival_time, T_g, signal
-        )
+        g = signal["green"]
+        a = signal["amber"]
+        r = signal["red"]
 
-        if T_g is not None:
-            cycle = signal["green"] + signal["amber"] + signal["red"]
-            phase_position = (arrival_time - T_g) % cycle
+        if t_mod < g:
+            # currently green
+            T_g = g - t_mod + a + r
+        elif t_mod < g + a:
+            # currently amber
+            T_g = (g + a) - t_mod + r
+        else:
+            # currently red
+            T_g = cycle - t_mod
+            
+        t = now - state["signal_start_time"]
+        cycle = g + a + r
+        t_mod = t % cycle
+
+        in_green = t_mod < g
+        time_left_in_green = g - t_mod
+        
+        if in_green and arrival_time <= time_left_in_green:
+          # ARRIVING IN CURRENT GREEN
+          window_index = 0
+          delta_start = arrival_time + t_mod
+          delta_end = delta_start - g
+        else:
+          window_index, delta_start, delta_end = classify_arrival(
+              arrival_time, T_g, signal
+          )
+
+          if T_g is not None:
+              cycle = signal["green"] + signal["amber"] + signal["red"]
+              phase_position = (arrival_time - T_g) % cycle
 
     advice = advisory_from_delta(delta_start, delta_end)
 

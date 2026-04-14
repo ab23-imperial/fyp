@@ -20,7 +20,6 @@ logger = PhaseLogger()
 
 # persistent state
 state = {
-    "sim_distance": SIGNALS[0]["distance"],
     "current_signal_idx": 0,
     "current_phase": None,
     "phase_start_time": None,
@@ -69,7 +68,7 @@ def gps():
         lat=data.get("lat"),
         lon=data.get("lon"),
         frame=frame,
-        use_vision=True,   # 👈 TURNED ON
+        use_vision=False,   # 👈 TURNED ON
         do_mock_reports=False,
         logger=logger
     )
