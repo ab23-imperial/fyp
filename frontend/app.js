@@ -1,12 +1,63 @@
+let lat = 19.006295404255074;
+let lon = 72.82930553467953;
+
+const TARGET_LAT = 19.006304427054125;
+const TARGET_LON = 72.82317790283602;
+
+const SPEED = 13; // m/s
+
+let lastTime = performance.now();
+
+// ---------------- GEO MOVE ----------------
+function moveTowards(targetLat, targetLon, speed, dt) {
+  const R = 6371000;
+
+  const toRad = x => x * Math.PI / 180;
+  const toDeg = x => x * 180 / Math.PI;
+
+  const lat1 = toRad(lat);
+  const lon1 = toRad(lon);
+  const lat2 = toRad(targetLat);
+  const lon2 = toRad(targetLon);
+
+  const dLat = lat2 - lat1;
+  const dLon = lon2 - lon1;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) *
+    Math.sin(dLon / 2) ** 2;
+
+  const dist = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  if (dist < 0.1) return;
+
+  const moveDist = Math.min(speed * dt, dist);
+  const ratio = moveDist / dist;
+
+  const newLat = lat1 + dLat * ratio;
+  const newLon = lon1 + dLon * ratio;
+
+  lat = toDeg(newLat);
+  lon = toDeg(newLon);
+}
+
+// ---------------- MAIN LOOP ----------------
 async function loop() {
+  const now = performance.now();
+  const dt = (now - lastTime) / 1000;
+  lastTime = now;
+
   try {
-    const res = await fetch("/gps", {
+    moveTowards(TARGET_LAT, TARGET_LON, SPEED, dt);
+
+    const res = await fetch("http://localhost:5050/gps", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        lat: 0,
-        lon: 0,
-        speed: 12.5
+        lat,
+        lon,
+        speed: SPEED
       })
     });
 
