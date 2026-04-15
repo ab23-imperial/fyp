@@ -1,12 +1,67 @@
 let lat = 19.006295404255074;
 let lon = 72.82930553467953;
 
-const TARGET_LAT = 19.006304427054125;
-const TARGET_LON = 72.82317790283602;
+const SIGNALS = [
+  { id: 1, lat: 19.006304427054125, lon: 72.82317790283602 },
+  { id: 2, lat: 19.0063103622219, lon: 72.8181054726819 }
+];
 
-const SPEED = 13; // m/s
+let currentTargetIdx = 0;
+
+let SPEED = 39;
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "w") {
+    SPEED += 2;
+  }
+  if (e.key === "s") {
+    SPEED = Math.max(1, SPEED - 2);
+  }
+
+  console.log("Speed:", SPEED);
+});
 
 let lastTime = performance.now();
+
+const EPS = 0.5; // metres
+
+const ARRIVAL_THRESHOLD = 5; // metres
+
+function updateTargetIfReached(prevDist, currentDist) {
+  if (currentDist < ARRIVAL_THRESHOLD) {
+    if (currentTargetIdx < SIGNALS.length - 1) {
+      currentTargetIdx++;
+      console.log("reached signal → switching");
+    }
+    return;
+  }
+
+  // fallback: overshoot detection
+  if (prevDist !== null && currentDist > prevDist + EPS) {
+    if (currentTargetIdx < SIGNALS.length - 1) {
+      currentTargetIdx++;
+      console.log("overshot signal → switching");
+    }
+  }
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+
+  const toRad = x => x * Math.PI / 180;
+
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+  const dphi = toRad(lat2 - lat1);
+  const dlambda = toRad(lon2 - lon1);
+
+  const a =
+    Math.sin(dphi / 2) ** 2 +
+    Math.cos(phi1) * Math.cos(phi2) *
+    Math.sin(dlambda / 2) ** 2;
+
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // ---------------- GEO MOVE ----------------
 function moveTowards(targetLat, targetLon, speed, dt) {
@@ -43,13 +98,26 @@ function moveTowards(targetLat, targetLon, speed, dt) {
 }
 
 // ---------------- MAIN LOOP ----------------
+let prevDist = null;
+
 async function loop() {
   const now = performance.now();
   const dt = (now - lastTime) / 1000;
   lastTime = now;
 
   try {
-    moveTowards(TARGET_LAT, TARGET_LON, SPEED, dt);
+    const target = SIGNALS[currentTargetIdx];
+
+    // compute distance BEFORE move
+    const distBefore = haversine(lat, lon, target.lat, target.lon);
+
+    moveTowards(target.lat, target.lon, SPEED, dt);
+
+    // compute distance AFTER move
+    const distAfter = haversine(lat, lon, target.lat, target.lon);
+
+    updateTargetIfReached(prevDist, distAfter);
+    prevDist = distAfter;
 
     const res = await fetch("http://localhost:5050/gps", {
       method: "POST",
@@ -88,9 +156,10 @@ function updateUI(data) {
   adviceEl.style.color = colour;
 
   // ---------------- DURATIONS ----------------
-  const redBefore = data?.red_before_dur ?? 4;
-  const green = data?.green_dur ?? 8;
-  const redAfter = data?.red_after_dur ?? 4;
+  const amber = data?.amber_dur ?? 2;
+  const redBefore = (data?.red_before_dur ?? 4) + 0.25 * amber;
+  const green = (data?.green_dur ?? 8) + 0.5 * amber;
+  const redAfter = (data?.red_after_dur ?? 4) + 0.25 * amber;
 
   const total = redBefore + green + redAfter;
 
@@ -139,9 +208,30 @@ function updateUI(data) {
   const textEl = document.getElementById("text");
 
   if (textEl && data?.distance !== undefined && data?.eta !== undefined) {
+    const speedKmh = (SPEED * 3.6).toFixed(1);
+
     textEl.innerText =
-      `${Math.round(data.distance)}m | ETA ${data.eta.toFixed(2)}s`;
+      `${Math.round(data.distance)}m | ETA ${data.eta.toFixed(2)}s | ${speedKmh} km/h`;
+  }
+
+  const signalEl = document.getElementById("signal-status");
+
+  if (signalEl && data?.phase) {
+    const map = {
+      green: "🟢",
+      amber: "🟠",
+      red: "🔴",
+      unknown: "⚪"
+    };
+
+    const emoji = map[data.phase] || "⚪";
+
+    // small, clean, includes id subtly
+    signalEl.innerText = `${emoji} ${data.signal_id ?? ""}`;
   }
 }
 
-loop();
+window.onload = () => {
+  console.log("STARTING LOOP");
+  loop();
+};
