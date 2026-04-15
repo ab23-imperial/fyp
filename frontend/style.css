@@ -40,6 +40,15 @@
   top: -30%;
 }
 
+#signal-status {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 75px;
+  z-index: 10;
+  opacity: 0.9;
+}
+
 #overlay {
   position: absolute;
   left: 50%;

@@ -17,6 +17,8 @@ DETECT_INTERVAL = 0.1
 SIM_SPEED = 12
 SIM_INITIAL_DISTANCE = 120
 
+SWITCH_DISTANCE_THRESHOLD = 20
+
 # SIGNALS = [
 #     {"id": 1, "distance": 120, "green": 2, "amber": 2, "red": 6},
 #     {"id": 2, "distance": 180, "green": 5, "amber": 2, "red": 8},
@@ -91,6 +93,50 @@ def get_nearest_signal(lat, lon):
         SIGNALS,
         key=lambda s: haversine(lat, lon, s["lat"], s["lon"])
     )
+    
+def get_active_signal(state, lat, lon):
+    # ---------------- INIT ----------------
+    if "active_signal_idx" not in state:
+        state["active_signal_idx"] = 0
+        state["prev_distance_to_signal"] = None
+
+    idx = state["active_signal_idx"]
+
+    # safety
+    if idx >= len(SIGNALS):
+        idx = len(SIGNALS) - 1
+        state["active_signal_idx"] = idx
+
+    current_signal = SIGNALS[idx]
+
+    # ---------------- DISTANCE ----------------
+    dist = haversine(lat, lon, current_signal["lat"], current_signal["lon"])
+    prev_dist = state["prev_distance_to_signal"]
+    print(f"{lat}, {lon}, {current_signal["lat"]}, {current_signal["lon"]}")
+    print(f"DIST: {dist}, prev: {prev_dist}")
+
+    # ---------------- PASS DETECTION ----------------
+    passed = False
+    if prev_dist is not None:
+        # distance was decreasing, now increasing → passed
+        if dist > prev_dist:
+            passed = True
+
+    state["prev_distance_to_signal"] = dist
+
+    # ---------------- SWITCH ----------------
+    if passed:
+        next_idx = idx + 1
+
+        if next_idx < len(SIGNALS):
+            print(f"\n--- BACKEND SWITCH → signal {SIGNALS[next_idx]['id']} ---\n")
+
+            state["active_signal_idx"] = next_idx
+            state["prev_distance_to_signal"] = None
+
+            return SIGNALS[next_idx]
+
+    return current_signal
   
 def stable_state(buffer):
     valid = [s for s in buffer if s != "unknown"]
@@ -233,8 +279,10 @@ def step_core(
     # ---------------- TIME ----------------
     dt = now - state.get("last_update_time", now)
     state["last_update_time"] = now
+    state.setdefault("prev_distance_to_signal", None)
+    state.setdefault("passed_signal", False)
     
-    signal = get_nearest_signal(lat, lon)
+    signal = get_active_signal(state, lat, lon)
 
     # ---------------- MOTION ----------------
     if speed is None:
@@ -243,9 +291,13 @@ def step_core(
     # ---------------- SIGNAL TRANSITION ----------------
     if signal["id"] != state.get("current_signal_id"):
       state["current_signal_id"] = signal["id"]
+
+      # RESET EVERYTHING CLEANLY
       state["signal_start_time"] = now
       state["current_phase"] = None
       state["phase_start_time"] = None
+
+      state["prev_distance_to_signal"] = None
 
       state_buffer.clear()
       phase_reports.clear()
@@ -397,6 +449,7 @@ def step_core(
         "red_dur": signal["red"],
         "red_before_dur": signal["red"],
         "red_after_dur": signal["red"],
+        "signal_id": signal["id"], 
     }
     
 # def main():

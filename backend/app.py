@@ -20,7 +20,7 @@ logger = PhaseLogger()
 
 # persistent state
 state = {
-    "current_signal_idx": 0,
+    "current_signal_id": None,
     "current_phase": None,
     "phase_start_time": None,
     "last_update_time": time.time(),
@@ -37,6 +37,12 @@ phase_reports = {}
 # serve index.html
 @app.route("/")
 def home():
+    global state, state_buffer, phase_reports
+
+    state.clear()
+    state_buffer.clear()
+    phase_reports.clear()
+
     return send_from_directory("../frontend", "index.html")
 
 # serve JS and other static files
@@ -58,6 +64,7 @@ def gps():
     ret, frame = cap.read()
     if not ret:
         frame = None
+    print(f"Data: {data}")
         
     result = step_core(
         state,
