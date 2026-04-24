@@ -6,10 +6,19 @@ import math
 from vision.detector import detect_signal
 from ui.simple_ui import SignalUI
 from phase_logger import PhaseLogger
+from world_builder import build_world
 
 # -------------------------
 # CONFIGURATION
 # -------------------------
+
+# START = (51.49538527920054, -0.18298237009240356)
+# END = (51.50238200712, -0.18821964439170594)
+# START = 19.008504229019124, 72.82237148280866
+# END = 19.00629650092297, 72.82158991396373
+START = 18.911684927211624, 72.82267284368089
+END = 19.008016427499072, 72.82208522753751
+END = 19.062949912905278, 72.8293817889422
 
 STATE_WINDOW = 5
 DETECT_INTERVAL = 0.1
@@ -20,15 +29,15 @@ SIM_INITIAL_DISTANCE = 120
 SWITCH_DISTANCE_THRESHOLD = 20
 
 # SIGNALS = [
-#     {"id": 1, "distance": 120, "green": 2, "amber": 2, "red": 6},
-#     {"id": 2, "distance": 180, "green": 5, "amber": 2, "red": 8},
-#     {"id": 3, "distance": 90,  "green": 3, "amber": 1, "red": 5},
+#     {"id": 1, "lat": 19.006304427054125, "lon": 72.82317790283602, "green": 2, "amber": 2, "red": 6},
+#     {"id": 2, "lat": 19.0063103622219, "lon": 72.8181054726819, "green": 5, "amber": 2, "red": 8},
 # ]
 
-SIGNALS = [
-    {"id": 1, "lat": 19.006304427054125, "lon": 72.82317790283602, "green": 2, "amber": 2, "red": 6},
-    {"id": 2, "lat": 19.0063103622219, "lon": 72.8181054726819, "green": 5, "amber": 2, "red": 8},
-]
+# start = (51.49538527920054, -0.18298237009240356)
+# end = (51.50238200712, -0.18821964439170594)
+
+route = None
+SIGNALS = None
 
 GREEN_DURATION = 2
 AMBER_DURATION = 2
@@ -68,6 +77,13 @@ last_sample_time = 0.0
 # HELPERS
 # -------------------------
 
+def init_world():
+    # start = (51.49538527920054, -0.18298237009240356)
+    # end = (51.50238200712, -0.18821964439170594)
+    start = START
+    end = END
+    return build_world(start, end)
+
 def get_true_phase(signal, t):
     cycle = signal["green"] + signal["amber"] + signal["red"]
     t_mod = t % cycle
@@ -94,49 +110,22 @@ def get_nearest_signal(lat, lon):
         key=lambda s: haversine(lat, lon, s["lat"], s["lon"])
     )
     
-def get_active_signal(state, lat, lon):
-    # ---------------- INIT ----------------
-    if "active_signal_idx" not in state:
-        state["active_signal_idx"] = 0
-        state["prev_distance_to_signal"] = None
+def get_active_signal(state, signals):
+    idx = state.get("active_signal_idx", 0)
+    idx = min(idx, len(signals) - 1)
 
-    idx = state["active_signal_idx"]
+    current = signals[idx]
 
-    # safety
-    if idx >= len(SIGNALS):
-        idx = len(SIGNALS) - 1
-        state["active_signal_idx"] = idx
+    route_idx = state.get("route_idx", 0)
 
-    current_signal = SIGNALS[idx]
+    # passed signal if route index passed it
+    if route_idx > current["route_idx"]:
+        if idx + 1 < len(signals):
+            idx += 1
+            state["active_signal_idx"] = idx
+            return signals[idx]
 
-    # ---------------- DISTANCE ----------------
-    dist = haversine(lat, lon, current_signal["lat"], current_signal["lon"])
-    prev_dist = state["prev_distance_to_signal"]
-    print(f"{lat}, {lon}, {current_signal["lat"]}, {current_signal["lon"]}")
-    print(f"DIST: {dist}, prev: {prev_dist}")
-
-    # ---------------- PASS DETECTION ----------------
-    passed = False
-    if prev_dist is not None:
-        # distance was decreasing, now increasing → passed
-        if dist > prev_dist:
-            passed = True
-
-    state["prev_distance_to_signal"] = dist
-
-    # ---------------- SWITCH ----------------
-    if passed:
-        next_idx = idx + 1
-
-        if next_idx < len(SIGNALS):
-            print(f"\n--- BACKEND SWITCH → signal {SIGNALS[next_idx]['id']} ---\n")
-
-            state["active_signal_idx"] = next_idx
-            state["prev_distance_to_signal"] = None
-
-            return SIGNALS[next_idx]
-
-    return current_signal
+    return current
   
 def stable_state(buffer):
     valid = [s for s in buffer if s != "unknown"]
@@ -172,18 +161,6 @@ def compute_time_to_next_green(phase, t_in_phase, signal):
 def add_phase_report(phase_reports, phase, signal):
     ts = time.time()
     phase_reports[ts] = (ts, phase, phase_duration(phase, signal))
-
-# def generate_mock_reports(phase_reports, last_report_time, mri, signal, interval=2.5):
-#     now = time.time()
-#     if now - last_report_time < interval:
-#         return last_report_time, mri
-
-#     phase = get_true_phase(signal, now)
-#     # mri = (mri + 1) % len(MOCK_REPORTS)
-#     add_phase_report(phase_reports, phase, signal)
-
-#     print(f"REPORTED: {phase}")
-#     return now, mri
   
 def generate_mock_reports(state, phase_reports, signal, now):
     signal_id = signal["id"]
@@ -256,12 +233,120 @@ def advisory_from_delta(delta_to_start, delta_to_end):
     if delta_to_end <= 0:
         return "arrive_during_green"
     return "arrive_after_green"
+  
+def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, window_index):
+    # convert to mph
+    current_mph = current_speed_mps * 2.23694
+
+    g = signal["green"]
+    a = signal["amber"]
+    r = signal["red"]
+    cycle = g + a + r
+
+    candidate_speeds = []
+
+    # try multiple future cycles
+    for k in range(window_index-2, window_index+2):
+        green_start = (cycle - t_mod) + k * cycle
+        green_end = green_start + g
+
+        # convert to speeds (m/s → mph)
+        v_min = distance_m / max(green_end, 0.1)
+        v_max = distance_m / max(green_start, 0.1)
+
+        mph_min = v_min * 2.23694
+        mph_max = v_max * 2.23694
+
+        if mph_min <= mph_max:
+            candidate_speeds.append((mph_min, mph_max))
+
+    if not candidate_speeds:
+        return None
+
+    # -------- choose best speed --------
+    best_speed = None
+    best_cost = float("inf")
+
+    for k, (lo, hi) in enumerate(candidate_speeds):
+        # --- OPTION 1: slow down into band ---
+        slow_target = min(current_mph, hi)
+
+        # --- OPTION 2: speed up into band ---
+        fast_target = max(current_mph, lo)
+
+        candidates = []
+
+        # only valid if inside band
+        if lo <= slow_target <= hi:
+            candidates.append(("slow", slow_target))
+
+        if lo <= fast_target <= hi:
+            candidates.append(("fast", fast_target))
+
+        for mode, target in candidates:
+            cost = abs(target - current_mph)
+
+            # 🔑 directional bias
+            if mode == "fast":
+                cost *= 1.3   # penalise speeding
+            else:
+                cost *= 0.6   # slightly prefer slowing
+
+            # 🔑 penalise far future windows
+            # cost += k * 2.5
+
+            # avoid crawling
+            if target < 8:
+                cost += 5
+
+            if cost < best_cost:
+                best_cost = cost
+                best_speed = target
+                
+    return best_speed
+  
+def update_route_progress(state, route, lat, lon):
+    idx = state["route_idx"]
+
+    if idx >= len(route) - 1:
+        return idx
+
+    next_pt = route[idx]
+    dist = haversine(lat, lon, next_pt[0], next_pt[1])
+
+    if dist < 6:  # same threshold as frontend
+        state["route_idx"] += 1
+
+    return state["route_idx"]
+  
+def route_distance_to_signal(route, current_idx, signal_idx, lat, lon):
+    signal_pt = route[signal_idx]
+    actual_dist = haversine(lat, lon, signal_pt[0], signal_pt[1])
+
+    if signal_idx <= current_idx and actual_dist < 15:
+        return 0
+
+    dist = 0
+
+    # 🔥 KEY FIX: current position → next waypoint
+    next_pt = route[current_idx]
+    dist += haversine(lat, lon, next_pt[0], next_pt[1])
+
+    # remaining full segments
+    for i in range(current_idx, signal_idx):
+        a = route[i]
+        b = route[i + 1]
+        dist += haversine(a[0], a[1], b[0], b[1])
+
+    return dist
     
 def step_core(
     state,
     state_buffer,
     phase_reports,
+    signals,
     *,
+    route=None,
     lat=None,
     lon=None,
     now=None,
@@ -269,20 +354,22 @@ def step_core(
     frame=None,
     use_vision=False,
     do_mock_reports=True,
-    logger=None
+    logger=None,
+    route_idx=None
 ):
     if logger is None:
         logger = PhaseLogger()
     if now is None:
         now = time.time()
-
+        
     # ---------------- TIME ----------------
     dt = now - state.get("last_update_time", now)
     state["last_update_time"] = now
     state.setdefault("prev_distance_to_signal", None)
     state.setdefault("passed_signal", False)
+    state.setdefault("route_idx", 0)
     
-    signal = get_active_signal(state, lat, lon)
+    signal = get_active_signal(state, signals)
 
     # ---------------- MOTION ----------------
     if speed is None:
@@ -303,35 +390,33 @@ def step_core(
       phase_reports.clear()
 
       print(f"\n--- Switched to signal {signal['id']} ---\n")
-    # if state["sim_distance"] <= 0:
-    #   state["current_signal_idx"] += 1
+    
+    # distance = haversine(
+    #     lat, lon,
+    #     signal["lat"], signal["lon"]
+    # )
+    
+    if route_idx is not None:
+        state["route_idx"] = route_idx
+        route_idx = route_idx
+    else:
+        # REAL GPS MODE
+        route_idx = update_route_progress(state, route, lat, lon)
 
-    #   if state["current_signal_idx"] >= len(SIGNALS):
-    #       # loop for now
-    #       state["current_signal_idx"] = 0
-
-    #   next_signal = SIGNALS[state["current_signal_idx"]]
-
-    #   # reset for next signal
-    #   state["sim_distance"] = next_signal["distance"]
-    #   state["current_phase"] = None
-    #   state["phase_start_time"] = None
-
-    #   state_buffer.clear()
-    #   phase_reports.clear()
-    #   state["last_report_time"] = 0
-    #   state["mri"] = 0
-    #   state["signal_start_time"] = now
-
-    #   print(f"\n--- Switched to signal {next_signal['id']} ---\n")
-      
-    # distance = state["sim_distance"]
-    # print(f"dist betw ({lat}, {lon}) and ({signal["lat"]}, {signal["lon"]})")
-    distance = haversine(
-        lat, lon,
-        signal["lat"], signal["lon"]
+    distance = route_distance_to_signal(
+        route,
+        route_idx,
+        signal["route_idx"],
+        lat,
+        lon
     )
-    arrival_time = distance / max(speed, 0.1)
+    speed = max(speed or SIM_SPEED, 0.1)
+    arrival_time = distance / speed
+
+    # --- compute signal-relative time ---
+    t = now - state["signal_start_time"]
+    cycle = signal["green"] + signal["amber"] + signal["red"]
+    t_mod = t % cycle
 
     # ---------------- VISION ----------------
     if use_vision and frame is not None:
@@ -412,18 +497,25 @@ def step_core(
           window_index = 0
           delta_start = arrival_time + t_mod
           delta_end = delta_start - g
+          advice = "arrive_during_green"
         else:
           window_index, delta_start, delta_end = classify_arrival(
               arrival_time, T_g, signal
           )
-
+          advice = advisory_from_delta(delta_start, delta_end)
           if T_g is not None:
               cycle = signal["green"] + signal["amber"] + signal["red"]
               phase_position = (arrival_time - T_g) % cycle
+    
+    # --- NEW: target speed ---    
+    if advice == "arrive_during_green":
+        target_mph = speed * 2.23694
 
-    advice = advisory_from_delta(delta_start, delta_end)
+    elif advice is not None:
+        target_mph = compute_target_speed_mph(distance, signal, t_mod, speed, window_index)
 
     # ---------------- DEBUG ----------------
+    target_str = f"{target_mph:.1f}" if target_mph is not None else "None"
     print(
         f"dist={distance:.1f}m | "
         f"arr={arrival_time:.2f}s | "
@@ -432,7 +524,8 @@ def step_core(
         f"Δstart={delta_start} | "
         f"Δend={delta_end} | "
         f"{state.get('current_phase')} | "
-        f"{advice}"
+        f"{advice} | "
+        f"curr={speed*2.23694:.1f}mph → target={target_str}"
     )
 
     return {
@@ -449,36 +542,7 @@ def step_core(
         "red_dur": signal["red"],
         "red_before_dur": signal["red"],
         "red_after_dur": signal["red"],
-        "signal_id": signal["id"], 
+        "signal_id": signal["id"],
+        "target_speed_mph": target_mph,
+        "current_speed_mph": speed * 2.23694,
     }
-    
-# def main():
-#   logger = PhaseLogger()
-#   state = {
-#     "sim_distance": SIGNALS[0]["distance"],
-#     "current_signal_idx": 0,
-#     "current_phase": None,
-#     "phase_start_time": None,
-#     "last_update_time": time.time(),
-#     "last_report_time": 0,
-#     "mri": 0,
-#   }
-
-#   state_buffer = []
-#   phase_reports = {}
-
-#   gps = {"lat": 19.0, "lon": 72.0, "speed": 5}
-
-#   for _ in range(5):
-#       result = step_core(
-#         state,
-#         state_buffer,
-#         phase_reports,
-#         speed=gps["speed"],
-#         logger=logger
-#       )
-#       print(result)
-#       time.sleep(1)
-  
-# if __name__ == "__main__":
-#   main()

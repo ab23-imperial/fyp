@@ -6,6 +6,11 @@
 </head>
 <body>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<div id="map" style="height: 300px; margin-top: 10px;"></div>
+
 <div id="container">
   <div id="signal-status">⚪</div>
   <img id="road" src="/ui/lib/road2.png" />
@@ -21,6 +26,7 @@
   <div id="hud">
     <div id="advice">Loading...</div>
     <div id="text"></div>
+    <!-- <div id="target" style="font-size: 18px; margin-top: 6px;"></div> -->
   </div>
 </div>
 

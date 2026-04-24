@@ -1,137 +1,17 @@
 [
   {
-    "signal_id": 1,
+    "signal_id": 9,
     "phase": "green",
-    "timestamp": 1776238642.3628402
+    "timestamp": 1777037939.981886
   },
   {
-    "signal_id": 1,
-    "phase": "green",
-    "timestamp": 1776238643.8347461
-  },
-  {
-    "signal_id": 1,
+    "signal_id": 9,
     "phase": "amber",
-    "timestamp": 1776238646.080883
+    "timestamp": 1777037965.639746
   },
   {
-    "signal_id": 1,
+    "signal_id": 9,
     "phase": "red",
-    "timestamp": 1776238647.854204
-  },
-  {
-    "signal_id": 1,
-    "phase": "green",
-    "timestamp": 1776238654.083236
-  },
-  {
-    "signal_id": 1,
-    "phase": "amber",
-    "timestamp": 1776238656.059998
-  },
-  {
-    "signal_id": 1,
-    "phase": "red",
-    "timestamp": 1776238658.01693
-  },
-  {
-    "signal_id": 1,
-    "phase": "green",
-    "timestamp": 1776238659.4213219
-  },
-  {
-    "signal_id": 1,
-    "phase": "amber",
-    "timestamp": 1776238661.553372
-  },
-  {
-    "signal_id": 1,
-    "phase": "red",
-    "timestamp": 1776238663.447809
-  },
-  {
-    "signal_id": 1,
-    "phase": "green",
-    "timestamp": 1776238669.672878
-  },
-  {
-    "signal_id": 1,
-    "phase": "amber",
-    "timestamp": 1776238671.5794718
-  },
-  {
-    "signal_id": 1,
-    "phase": "red",
-    "timestamp": 1776238673.508555
-  },
-  {
-    "signal_id": 1,
-    "phase": "green",
-    "timestamp": 1776238679.5063
-  },
-  {
-    "signal_id": 1,
-    "phase": "amber",
-    "timestamp": 1776238681.639905
-  },
-  {
-    "signal_id": 1,
-    "phase": "red",
-    "timestamp": 1776238683.553347
-  },
-  {
-    "signal_id": 1,
-    "phase": "green",
-    "timestamp": 1776238689.5801148
-  },
-  {
-    "signal_id": 2,
-    "phase": "green",
-    "timestamp": 1776238691.205312
-  },
-  {
-    "signal_id": 2,
-    "phase": "amber",
-    "timestamp": 1776238696.3701818
-  },
-  {
-    "signal_id": 2,
-    "phase": "red",
-    "timestamp": 1776238698.271007
-  },
-  {
-    "signal_id": 2,
-    "phase": "green",
-    "timestamp": 1776238706.237792
-  },
-  {
-    "signal_id": 2,
-    "phase": "amber",
-    "timestamp": 1776238711.44266
-  },
-  {
-    "signal_id": 2,
-    "phase": "red",
-    "timestamp": 1776238713.3429172
-  },
-  {
-    "signal_id": 2,
-    "phase": "green",
-    "timestamp": 1776238721.480573
-  },
-  {
-    "signal_id": 2,
-    "phase": "amber",
-    "timestamp": 1776238726.406754
-  },
-  {
-    "signal_id": 2,
-    "phase": "red",
-    "timestamp": 1776238728.2458339
-  },
-  {
-    "signal_id": 2,
-    "phase": "green",
-    "timestamp": 1776238736.4474392
+    "timestamp": 1777037967.1971462
   }
 ]

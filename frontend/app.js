@@ -1,72 +1,135 @@
-let lat = 19.006295404255074;
-let lon = 72.82930553467953;
+let MODE = "REAL";
 
-const SIGNALS = [
-  { id: 1, lat: 19.006304427054125, lon: 72.82317790283602 },
-  { id: 2, lat: 19.0063103622219, lon: 72.8181054726819 }
-];
+function toggleMode() {
+  MODE = MODE === "SIM" ? "REAL" : "SIM";
+  console.log("Mode:", MODE);
+}
 
-let currentTargetIdx = 0;
+let lat = 0;
+let lon = 0;
 
-let SPEED = 39;
+let route = [];
+let routeIndex = 0;
 
-window.addEventListener("keydown", (e) => {
-  if (e.key === "w") {
-    SPEED += 2;
-  }
-  if (e.key === "s") {
-    SPEED = Math.max(1, SPEED - 2);
-  }
+let KMH = 10;
+let SPEED = KMH/3.6;
+let running = true;
 
-  console.log("Speed:", SPEED);
-});
+let prevLat = null;
+let prevLon = null;
+let prevTime = null;
+let smoothSpeed = 0;
+
+const ARRIVAL_THRESHOLD = 6;
+
+const USE_MAP = typeof L !== "undefined";
 
 let lastTime = performance.now();
 
-const EPS = 0.5; // metres
+let map, routeLine, marker;
 
-const ARRIVAL_THRESHOLD = 5; // metres
+function initMap() {
+  if (!route.length) return;
+  if (typeof L === "undefined") return;
 
-function updateTargetIfReached(prevDist, currentDist) {
-  if (currentDist < ARRIVAL_THRESHOLD) {
-    if (currentTargetIdx < SIGNALS.length - 1) {
-      currentTargetIdx++;
-      console.log("reached signal → switching");
-    }
+  const first = route[0];
+
+  map = L.map("map").setView(first, 16);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap"
+  }).addTo(map);
+
+  // draw route
+  routeLine = L.polyline(route, {color: "blue"}).addTo(map);
+
+  // marker for you
+  marker = L.marker(first).addTo(map);
+}
+
+async function initWorld() {
+  const res = await fetch("/init");
+  const data = await res.json();
+
+  route = data.route || [];
+
+  if (!route.length) {
+    console.error("No route received");
     return;
   }
 
-  // fallback: overshoot detection
-  if (prevDist !== null && currentDist > prevDist + EPS) {
-    if (currentTargetIdx < SIGNALS.length - 1) {
-      currentTargetIdx++;
-      console.log("overshot signal → switching");
+  routeIndex = 0;
+  [lat, lon] = route[0];
+
+  console.log("World loaded, route points:", route.length);
+  if (USE_MAP) initMap();
+  if (typeof L !== "undefined" && map) {
+    for (const s of data.signals) {
+      L.circleMarker([s.lat, s.lon], {
+        radius: 5,
+        color: "red"
+      }).addTo(map);
     }
   }
+}
+
+async function initFromGPS(endLat, endLon) {
+  const gps = await getPhoneLocation();
+
+  const res = await fetch("/init_from_gps", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      lat: gps.lat,
+      lon: gps.lon,
+      end: [endLat, endLon]
+    })
+  });
+
+  const data = await res.json();
+  route = data.route;
+}
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "w") SPEED += 1/3.6;
+  if (e.key === "s") SPEED = Math.max(1, SPEED - 1/3.6);
+  console.log("Speed:", SPEED);
+});
+
+function getPhoneLocation() {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        resolve({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          speed: pos.coords.speed || SPEED // fallback
+        });
+      },
+      reject,
+      { enableHighAccuracy: true }
+    );
+  });
 }
 
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000;
-
   const toRad = x => x * Math.PI / 180;
 
-  const phi1 = toRad(lat1);
-  const phi2 = toRad(lat2);
-  const dphi = toRad(lat2 - lat1);
-  const dlambda = toRad(lon2 - lon1);
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
 
   const a =
-    Math.sin(dphi / 2) ** 2 +
-    Math.cos(phi1) * Math.cos(phi2) *
-    Math.sin(dlambda / 2) ** 2;
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) ** 2;
 
   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ---------------- GEO MOVE ----------------
 function moveTowards(targetLat, targetLon, speed, dt) {
   const R = 6371000;
-
   const toRad = x => x * Math.PI / 180;
   const toDeg = x => x * 180 / Math.PI;
 
@@ -85,63 +148,113 @@ function moveTowards(targetLat, targetLon, speed, dt) {
 
   const dist = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  if (dist < 0.1) return;
+  console.log(dist)
+
+  if (dist < 0.5) return;
 
   const moveDist = Math.min(speed * dt, dist);
   const ratio = moveDist / dist;
 
-  const newLat = lat1 + dLat * ratio;
-  const newLon = lon1 + dLon * ratio;
-
-  lat = toDeg(newLat);
-  lon = toDeg(newLon);
+  lat = toDeg(lat1 + dLat * ratio);
+  lon = toDeg(lon1 + dLon * ratio);
 }
 
-// ---------------- MAIN LOOP ----------------
-let prevDist = null;
+function updateRouteProgress() {
+  if (routeIndex >= route.length - 1) return;
+
+  const [tx, ty] = route[routeIndex];
+  const dist = haversine(lat, lon, tx, ty);
+
+  if (dist < ARRIVAL_THRESHOLD) {
+    routeIndex++;
+    console.log("route →", routeIndex);
+  }
+}
 
 async function loop() {
+  if (!running) return;
+
   const now = performance.now();
   const dt = (now - lastTime) / 1000;
   lastTime = now;
 
   try {
-    const target = SIGNALS[currentTargetIdx];
+    let payload = {};
 
-    // compute distance BEFORE move
-    const distBefore = haversine(lat, lon, target.lat, target.lon);
+    if (MODE === "SIM") {
+      const target = route[routeIndex];
+      if (!target) return;
 
-    moveTowards(target.lat, target.lon, SPEED, dt);
+      moveTowards(target[0], target[1], SPEED, dt);
+      updateRouteProgress();
 
-    // compute distance AFTER move
-    const distAfter = haversine(lat, lon, target.lat, target.lon);
-
-    updateTargetIfReached(prevDist, distAfter);
-    prevDist = distAfter;
-
-    const res = await fetch("http://localhost:5050/gps", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      payload = {
         lat,
         lon,
-        speed: SPEED
-      })
+        speed: SPEED,
+        route_idx: routeIndex
+      };
+
+    } else {
+      const gps = await getPhoneLocation();
+
+      const now = performance.now();
+
+      let computedSpeed = SPEED;
+
+      if (prevLat !== null) {
+        const dist = haversine(prevLat, prevLon, gps.lat, gps.lon);
+        const dt = (now - prevTime) / 1000;
+
+        if (dt > 0) {
+          computedSpeed = dist / dt;
+        }
+      }
+
+      // smooth it
+      smoothSpeed = 0.7 * smoothSpeed + 0.3 * computedSpeed;
+
+      // update history
+      prevLat = gps.lat;
+      prevLon = gps.lon;
+      prevTime = now;
+
+      lat = gps.lat;
+      lon = gps.lon;
+
+      payload = {
+        lat,
+        lon,
+        speed: smoothSpeed, // ✅ use your computed value
+        route_idx: null
+      };
+    }
+
+    const res = await fetch("/gps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
 
     const data = await res.json();
+    updateUI(data);
 
-    if (data) updateUI(data);
+    if (marker) {
+      marker.setLatLng([lat, lon]);
+    }
+    if (USE_MAP && map) {
+      map.panTo([lat, lon]);
+    }
 
   } catch (err) {
-    console.error("Fetch error:", err);
+    console.error("loop error:", err);
+    running = false;
   }
 
   setTimeout(loop, 200);
 }
 
 function updateUI(data) {
-  // ---------------- ADVICE ----------------
   const adviceMap = {
     arrive_before_green: ["ARRIVE BEFORE GREEN", "red"],
     arrive_during_green: ["ARRIVE DURING GREEN", "lime"],
@@ -152,8 +265,10 @@ function updateUI(data) {
   const [text, colour] = adviceMap[data?.advice] || ["NO DATA", "grey"];
 
   const adviceEl = document.getElementById("advice");
-  adviceEl.innerText = text;
-  adviceEl.style.color = colour;
+  // if (adviceEl) {
+  //   adviceEl.innerText = text;
+  //   adviceEl.style.color = colour;
+  // }
 
   // ---------------- DURATIONS ----------------
   const amber = data?.amber_dur ?? 2;
@@ -204,34 +319,63 @@ function updateUI(data) {
     car.style.top = `${y - carHeight / 2}px`;
   }
 
-  // ---------------- TEXT ----------------
   const textEl = document.getElementById("text");
-
-  if (textEl && data?.distance !== undefined && data?.eta !== undefined) {
-    const speedKmh = (SPEED * 3.6).toFixed(1);
-
+  if (textEl && data?.distance != null && data?.eta != null) {
+    const currentMph = data?.current_speed_mph ?? (SPEED * 2.23694);
     textEl.innerText =
-      `${Math.round(data.distance)}m | ETA ${data.eta.toFixed(2)}s | ${speedKmh} km/h`;
+      `${Math.round(data.distance)}m | ETA ${data.eta.toFixed(1)}s | ${currentMph.toFixed(1)} mph`;
+
+    const target = data?.target_speed_mph;
+
+    const targetEl = document.getElementById("advice");
+
+    if (targetEl && target != null) {
+      const diff = target - currentMph;
+
+      let label = "";
+      let colour = "white";
+
+      if (Math.abs(diff) < 1) {
+        label = `Maintain ${target.toFixed(1)} mph`;
+        colour = "white";
+      } else if (diff > 0) {
+        label = `Speed up to ${target.toFixed(1)} mph`;
+        colour = "orange";
+      } else {
+        label = `Slow down to ${target.toFixed(1)} mph`;
+        colour = "cyan";
+      }
+
+      targetEl.innerText = label;
+      targetEl.style.color = colour;
+    }
   }
 
   const signalEl = document.getElementById("signal-status");
-
   if (signalEl && data?.phase) {
-    const map = {
-      green: "🟢",
-      amber: "🟠",
-      red: "🔴",
-      unknown: "⚪"
-    };
-
-    const emoji = map[data.phase] || "⚪";
-
-    // small, clean, includes id subtly
-    signalEl.innerText = `${emoji} ${data.signal_id ?? ""}`;
+    const map = { green: "🟢", amber: "🟠", red: "🔴", unknown: "⚪" };
+    signalEl.innerText = `${map[data.phase] || "⚪"} ${data.signal_id ?? ""}`;
   }
 }
 
-window.onload = () => {
-  console.log("STARTING LOOP");
-  loop();
+window.onload = async () => {
+  try {
+    if (MODE === "REAL") {
+      await initFromGPS();
+    } else {
+      await initWorld();
+    }
+
+    if (!route.length) {
+      document.getElementById("advice").innerText = "Init failed";
+      alert(`why: ${route.length}`);
+      return;
+    }
+
+    loop();
+
+  } catch (e) {
+    console.error("INIT FAILED:", e);
+    alert(`Init failed: ${e.message || e}`);
+  }
 };
