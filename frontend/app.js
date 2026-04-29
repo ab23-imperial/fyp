@@ -1,4 +1,4 @@
-let MODE = "REAL";
+let MODE = "SIM";
 
 function toggleMode() {
   MODE = MODE === "SIM" ? "REAL" : "SIM";
@@ -323,7 +323,7 @@ function updateUI(data) {
   if (textEl && data?.distance != null && data?.eta != null) {
     const currentMph = data?.current_speed_mph ?? (SPEED * 2.23694);
     textEl.innerText =
-      `${Math.round(data.distance)}m | ETA ${data.eta.toFixed(1)}s | ${currentMph.toFixed(1)} mph`;
+      `${Math.round(data.distance)}m | ETA ${data.eta.toFixed(0)}s | ${currentMph.toFixed(0)} mph`;
 
     const target = data?.target_speed_mph;
 
@@ -336,13 +336,13 @@ function updateUI(data) {
       let colour = "white";
 
       if (Math.abs(diff) < 1) {
-        label = `Maintain ${target.toFixed(1)} mph`;
+        label = `HOLD\n${target.toFixed(0)} mph`;
         colour = "white";
       } else if (diff > 0) {
-        label = `Speed up to ${target.toFixed(1)} mph`;
+        label = `↑ SPEED UP\n${target.toFixed(0)} mph`;
         colour = "orange";
       } else {
-        label = `Slow down to ${target.toFixed(1)} mph`;
+        label = `↓ SLOW DOWN\n${target.toFixed(0)} mph`;
         colour = "cyan";
       }
 
@@ -355,6 +355,24 @@ function updateUI(data) {
   if (signalEl && data?.phase) {
     const map = { green: "🟢", amber: "🟠", red: "🔴", unknown: "⚪" };
     signalEl.innerText = `${map[data.phase] || "⚪"} ${data.signal_id ?? ""}`;
+  }
+
+  const distance = data?.distance ?? 9999;
+  const mapEl = document.getElementById("map");
+
+  if (distance > 200) {
+    if (mapEl) mapEl.style.display = "block";
+    if (container) container.style.display = "none";
+  
+    if (map) {
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 50);
+    }
+  } else {
+    // NEAR → show signal UI
+    if (mapEl) mapEl.style.display = "none";
+    if (container) container.style.display = "block";
   }
 }
 

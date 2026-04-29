@@ -14,6 +14,8 @@ logger = PhaseLogger()
 # ---------------- WORLD (single source of truth) ----------------
 route, signals = init_world()
 
+SPEED_LIMIT = 35
+
 world = {
     "route": route,
     "signals": signals
@@ -124,7 +126,8 @@ def gps():
         use_vision=False,
         do_mock_reports=False,
         logger=logger,
-        route_idx=data.get("route_idx")
+        route_idx=data.get("route_idx"),
+        speed_limit=SPEED_LIMIT
     )
 
     return jsonify(result)

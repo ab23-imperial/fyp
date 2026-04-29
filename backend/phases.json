@@ -2,16 +2,16 @@
   {
     "signal_id": 9,
     "phase": "green",
-    "timestamp": 1777037939.981886
+    "timestamp": 1777440880.520993
   },
   {
     "signal_id": 9,
-    "phase": "amber",
-    "timestamp": 1777037965.639746
+    "phase": "green",
+    "timestamp": 1777440965.584746
   },
   {
     "signal_id": 9,
-    "phase": "red",
-    "timestamp": 1777037967.1971462
+    "phase": "green",
+    "timestamp": 1777441266.8335528
   }
 ]

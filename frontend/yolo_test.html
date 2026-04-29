@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Signal Test</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+    }
+
+    video, canvas {
+      width: 100%;
+      max-width: 500px;
+    }
+
+    #output {
+      font-size: 32px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Traffic Light Detection</h2>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<div id="output">Loading...</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+<script src="yolo_test.js"></script>
+
+<div id="debug" style="font-size:14px; margin-top:10px;"></div>
+
+</body>
+</html>

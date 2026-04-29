@@ -24,6 +24,16 @@
   text-align: center;
 }
 
+#map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;   /* 🔑 use dvh, not vh */
+  z-index: 1;
+  display: none;
+}
+
 #text {
   margin-top: 5px;
   font-size: clamp(14px, 6vw, 45px);

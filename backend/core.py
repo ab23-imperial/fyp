@@ -16,9 +16,10 @@ from world_builder import build_world
 # END = (51.50238200712, -0.18821964439170594)
 # START = 19.008504229019124, 72.82237148280866
 # END = 19.00629650092297, 72.82158991396373
-START = 18.911684927211624, 72.82267284368089
-END = 19.008016427499072, 72.82208522753751
-END = 19.062949912905278, 72.8293817889422
+START = 18.911684927211624, 72.82267284368089 # Acro
+START = 19.008016427499072, 72.82208522753751 # Artesia
+END = 19.008016427499072, 72.82208522753751 # Artesia
+END = 19.063222250540132, 72.83081203243785 # Shiv Asthan
 
 STATE_WINDOW = 5
 DETECT_INTERVAL = 0.1
@@ -234,7 +235,7 @@ def advisory_from_delta(delta_to_start, delta_to_end):
         return "arrive_during_green"
     return "arrive_after_green"
   
-def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, window_index):
+def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, window_index, speed_limit):
     # convert to mph
     current_mph = current_speed_mps * 2.23694
 
@@ -257,7 +258,7 @@ def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, windo
         mph_min = v_min * 2.23694
         mph_max = v_max * 2.23694
 
-        if mph_min <= mph_max:
+        if mph_min <= mph_max and mph_min < speed_limit and mph_max < speed_limit:
             candidate_speeds.append((mph_min, mph_max))
 
     if not candidate_speeds:
@@ -355,7 +356,8 @@ def step_core(
     use_vision=False,
     do_mock_reports=True,
     logger=None,
-    route_idx=None
+    route_idx=None,
+    speed_limit=None
 ):
     if logger is None:
         logger = PhaseLogger()
@@ -380,7 +382,7 @@ def step_core(
       state["current_signal_id"] = signal["id"]
 
       # RESET EVERYTHING CLEANLY
-      state["signal_start_time"] = now
+      # state["signal_start_time"] = now
       state["current_phase"] = None
       state["phase_start_time"] = None
 
@@ -512,7 +514,7 @@ def step_core(
         target_mph = speed * 2.23694
 
     elif advice is not None:
-        target_mph = compute_target_speed_mph(distance, signal, t_mod, speed, window_index)
+        target_mph = compute_target_speed_mph(distance, signal, t_mod, speed, window_index, speed_limit)
 
     # ---------------- DEBUG ----------------
     target_str = f"{target_mph:.1f}" if target_mph is not None else "None"
