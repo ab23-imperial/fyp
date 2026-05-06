@@ -1,17 +1,7 @@
 [
   {
-    "signal_id": 9,
+    "signal_id": 62,
     "phase": "green",
-    "timestamp": 1777440880.520993
-  },
-  {
-    "signal_id": 9,
-    "phase": "green",
-    "timestamp": 1777440965.584746
-  },
-  {
-    "signal_id": 9,
-    "phase": "green",
-    "timestamp": 1777441266.8335528
+    "timestamp": 1778063840.415645
   }
 ]

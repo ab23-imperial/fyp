@@ -73,6 +73,41 @@ async function initWorld() {
   }
 }
 
+async function initRoute(start, end) {
+  const res = await fetch("/init_route", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ start, end })
+  });
+
+  const data = await res.json();
+
+  route = data.route || [];
+
+  if (!route.length) {
+    console.error("No route received");
+    return;
+  }
+
+  // ✅ SAME AS initWorld
+  routeIndex = 0;
+  [lat, lon] = route[0];
+
+  console.log("Route loaded, points:", route.length);
+
+  // ✅ map setup
+  if (USE_MAP) initMap();
+
+  if (typeof L !== "undefined" && map) {
+    for (const s of data.signals) {
+      L.circleMarker([s.lat, s.lon], {
+        radius: 5,
+        color: "red"
+      }).addTo(map);
+    }
+  }
+}
+
 async function initFromGPS(endLat, endLon) {
   const gps = await getPhoneLocation();
 
@@ -92,7 +127,7 @@ async function initFromGPS(endLat, endLon) {
 
 window.addEventListener("keydown", (e) => {
   if (e.key === "w") SPEED += 1/3.6;
-  if (e.key === "s") SPEED = Math.max(1, SPEED - 1/3.6);
+  if (e.key === "s") SPEED = Math.max(0.1, SPEED - 1/3.6);
   console.log("Speed:", SPEED);
 });
 
@@ -291,12 +326,12 @@ function updateUI(data) {
   overlay.style.background = `
     linear-gradient(
       to bottom,
-      red 0%,
-      orange ${greenStart * 0.6}%,
-      green ${greenStart}%,
-      green ${greenEnd}%,
-      orange ${greenEnd + (100 - greenEnd) * 0.4}%,
-      red 100%
+      #c21111 0%,
+      #e68917 ${greenStart * 0.6}%,
+      #2c7d29 ${greenStart}%,
+      #2c7d29 ${greenEnd}%,
+      #e68917 ${greenEnd + (100 - greenEnd) * 0.4}%,
+      #c21111 100%
     )
   `;
 
@@ -354,7 +389,7 @@ function updateUI(data) {
   const signalEl = document.getElementById("signal-status");
   if (signalEl && data?.phase) {
     const map = { green: "🟢", amber: "🟠", red: "🔴", unknown: "⚪" };
-    signalEl.innerText = `${map[data.phase] || "⚪"} ${data.signal_id ?? ""}`;
+    signalEl.innerText = `${map[data.phase] || "⚪"}`;
   }
 
   const distance = data?.distance ?? 9999;
@@ -378,11 +413,19 @@ function updateUI(data) {
 
 window.onload = async () => {
   try {
-    if (MODE === "REAL") {
-      await initFromGPS();
-    } else {
-      await initWorld();
-    }
+    await initWorld();
+    // if (MODE === "REAL") {
+    //   const gps = await getPhoneLocation();
+    //   await initRoute(
+    //     [gps.lat, gps.lon],
+    //     [51.5033, -0.1533]   // temp hardcoded destination
+    //   );
+    // } else {
+    //   await initRoute(
+    //     [51.5023, -0.1882],   // hardcode for now
+    //     [51.5033, -0.1533]
+    //   );
+    // }
 
     if (!route.length) {
       document.getElementById("advice").innerText = "Init failed";

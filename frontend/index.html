@@ -1,37 +1,117 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <link rel="stylesheet" href="/style.css">
-  <title>Signal Advisory</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Where to?</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB2Wng7KW3p4_b_skjJsJpmlHKW_3euUC8&libraries=places,marker"
+    defer
+  ></script>
+
+  <script src="index.js" defer></script>
+  <link rel="stylesheet" href="index.css">
 </head>
+
 <body>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      ArriveOnGreen
+    </div>
 
-<div id="map"></div>
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="btn-sim" onclick="setMode('SIM')">Simulation</button>
+      <button class="mode-btn" id="btn-real" onclick="setMode('REAL')">Real GPS</button>
+    </div>
+  </header>
 
-<div id="container">
-  <div id="signal-status">⚪</div>
-  <img id="road" src="/ui/lib/road2.png" />
+  <!-- HIDDEN SELECT FOR JS COMPAT -->
+  <select id="mode">
+    <option value="SIM">Simulation</option>
+    <option value="REAL">Real GPS</option>
+  </select>
 
-  <div id="overlay">
-    <!-- <div id="red1" class="segment"></div>
-    <div id="green" class="segment"></div>
-    <div id="red2" class="segment"></div> -->
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <h1 class="sidebar-heading">Where are<br>you <span>headed?</span></h1>
+
+      <!-- search -->
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="8.5" cy="8.5" r="5.5"/>
+          <path d="M13 13l3.5 3.5" stroke-linecap="round"/>
+        </svg>
+        <input id="search" type="text" placeholder="Search destination..." autocomplete="off" />
+      </div>
+
+      <!-- destination card -->
+      <div class="dest-card" id="dest-card">
+        <div class="dest-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+            <circle cx="12" cy="9" r="2.5"/>
+          </svg>
+        </div>
+        <div class="dest-info">
+          <div class="dest-label">Destination</div>
+          <div class="dest-coords" id="dest-coords">No destination selected</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- start -->
+      <button id="startBtn">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+        Start Navigation
+      </button>
+    </aside>
+
+    <!-- MAP -->
+    <div id="map"></div>
+
   </div>
 
-  <img id="car" src="/ui/lib/car.png" />
+  <script>
+    function setMode(val) {
+      document.getElementById("mode").value = val;
+      document.getElementById("btn-sim").classList.toggle("active", val === "SIM");
+      document.getElementById("btn-real").classList.toggle("active", val === "REAL");
+    }
 
-  <div id="hud">
-    <div id="advice">Loading...</div>
-    <div id="text"></div>
-    <!-- <div id="target" style="font-size: 18px; margin-top: 6px;"></div> -->
-  </div>
-</div>
+    // Patch setMarker to update new UI
+    const _origSetMarker = window.setMarker;
 
-<div id="text"></div>
+    function updateDestCard(lat, lon) {
+      const card = document.getElementById("dest-card");
+      const coords = document.getElementById("dest-coords");
+      card.classList.add("has-dest");
+      coords.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    }
 
-<script src="app.js"></script>
+    // Hook into index.js setMarker after it loads
+    window.addEventListener("load", () => {
+      const orig = window.setMarker;
+      if (typeof orig === "function") {
+        window.setMarker = async function(lat, lon) {
+          await orig(lat, lon);
+          updateDestCard(lat, lon);
+        };
+      }
+    });
+  </script>
+
 </body>
 </html>

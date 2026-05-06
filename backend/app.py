@@ -12,16 +12,18 @@ app = Flask(__name__, static_folder="../frontend")
 logger = PhaseLogger()
 
 # ---------------- WORLD (single source of truth) ----------------
-route, signals = init_world()
+# route, signals = init_world()
 
 SPEED_LIMIT = 35
 
-world = {
-    "route": route,
-    "signals": signals
-}
+world = {}
 
-print("INIT WORLD:", world)
+# world = {
+#     "route": route,
+#     "signals": signals
+# }
+
+# print("INIT WORLD:", world)
 
 # ---------------- VIDEO ----------------
 cap = cv2.VideoCapture("test_videos/tv1.mp4")
@@ -54,12 +56,49 @@ def home():
     phase_reports.clear()
 
     return send_from_directory("../frontend", "index.html")
+  
+@app.route("/drive")
+def drive():
+    global state, state_buffer, phase_reports
+
+    state = reset_state()
+    state_buffer.clear()
+    phase_reports.clear()
+    return send_from_directory("../frontend", "drive.html")
 
 
 @app.route("/<path:path>")
 def static_files(path):
     return send_from_directory("../frontend", path)
 
+
+@app.route("/init_route", methods=["POST"])
+def init_route():
+    data = request.json
+
+    start = tuple(data["start"])   # [lat, lon]
+    end = tuple(data["end"])       # [lat, lon]
+
+    print(f"INIT ROUTE: start={start}, end={end}")
+
+    route, signals = build_world(start, end)
+
+    # update world
+    world["route"] = route
+    world["signals"] = signals
+
+    print("UPDATED WORLD:", world)
+
+    # reset state
+    global state
+    state = reset_state()
+    state_buffer.clear()
+    phase_reports.clear()
+
+    return jsonify({
+        "route": route,
+        "signals": signals
+    })
 
 @app.route("/init")
 def init():

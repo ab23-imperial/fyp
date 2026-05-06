@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="/drive.css">
+  <title>Signal Advisory</title>
+</head>
+<body>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<div id="map"></div>
+
+<div id="container">
+  <div id="signal-status">⚪</div>
+  <div id="road"></div>
+
+  <div id="overlay">
+    <!-- <div id="red1" class="segment"></div>
+    <div id="green" class="segment"></div>
+    <div id="red2" class="segment"></div> -->
+  </div>
+
+  <img id="car" src="/ui/lib/car.png" />
+
+  <div id="hud">
+    <div id="advice">Loading...</div>
+    <div id="text"></div>
+    <!-- <div id="target" style="font-size: 18px; margin-top: 6px;"></div> -->
+  </div>
+</div>
+
+<div id="text"></div>
+
+<script src="drive.js"></script>
+</body>
+</html>

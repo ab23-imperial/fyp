@@ -12,14 +12,15 @@ from world_builder import build_world
 # CONFIGURATION
 # -------------------------
 
-# START = (51.49538527920054, -0.18298237009240356)
-# END = (51.50238200712, -0.18821964439170594)
+# START = (51.49538527920054, -0.18298237009240356) # Gloucester road
+START = (51.50238200712, -0.18821964439170594) #  High street
+END = 51.503305724164406, -0.1533343537676268 # Knightsbridge
 # START = 19.008504229019124, 72.82237148280866
 # END = 19.00629650092297, 72.82158991396373
-START = 18.911684927211624, 72.82267284368089 # Acro
-START = 19.008016427499072, 72.82208522753751 # Artesia
-END = 19.008016427499072, 72.82208522753751 # Artesia
-END = 19.063222250540132, 72.83081203243785 # Shiv Asthan
+# START = 18.911684927211624, 72.82267284368089 # Acro
+# START = 19.008016427499072, 72.82208522753751 # Artesia
+# END = 19.008016427499072, 72.82208522753751 # Artesia
+# END = 19.063222250540132, 72.83081203243785 # Shiv Asthan
 
 STATE_WINDOW = 5
 DETECT_INTERVAL = 0.1
@@ -257,6 +258,7 @@ def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, windo
 
         mph_min = v_min * 2.23694
         mph_max = v_max * 2.23694
+        print(f"min: {mph_min}, max: {mph_max}")
 
         if mph_min <= mph_max and mph_min < speed_limit and mph_max < speed_limit:
             candidate_speeds.append((mph_min, mph_max))
@@ -268,12 +270,20 @@ def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, windo
     best_speed = None
     best_cost = float("inf")
 
-    for k, (lo, hi) in enumerate(candidate_speeds):
-        # --- OPTION 1: slow down into band ---
-        slow_target = min(current_mph, hi)
+    print(f"\nCURRENT = {current_mph:.2f}")
 
-        # --- OPTION 2: speed up into band ---
+    for k, (lo, hi) in enumerate(candidate_speeds):
+        slow_target = min(current_mph, hi)
         fast_target = max(current_mph, lo)
+
+        print(f"band {k}: lo={lo:.2f}, hi={hi:.2f}")
+        print(f"  slow_target={slow_target:.2f}, valid={lo <= slow_target <= hi}")
+        print(f"  fast_target={fast_target:.2f}, valid={lo <= fast_target <= hi}")
+        # # --- OPTION 1: slow down into band ---
+        # slow_target = min(current_mph, hi)
+
+        # # --- OPTION 2: speed up into band ---
+        # fast_target = max(current_mph, lo)
 
         candidates = []
 
@@ -289,9 +299,9 @@ def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, windo
 
             # 🔑 directional bias
             if mode == "fast":
-                cost *= 1.3   # penalise speeding
+                cost *= 1   # penalise speeding
             else:
-                cost *= 0.6   # slightly prefer slowing
+                cost *= 1   # slightly prefer slowing
 
             # 🔑 penalise far future windows
             # cost += k * 2.5
