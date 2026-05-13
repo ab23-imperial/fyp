@@ -3,113 +3,132 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Where to?</title>
+
+  <title>ArriveOnGreen</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <script
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB2Wng7KW3p4_b_skjJsJpmlHKW_3euUC8&libraries=places,marker"
-    defer
-  ></script>
-
-  <script src="index.js" defer></script>
   <link rel="stylesheet" href="index.css">
 </head>
 
 <body>
 
-  <!-- TOP BAR -->
+  <!-- background glow -->
+  <div class="bg-glow"></div>
+  <div class="grid"></div>
+
+  <!-- top -->
   <header class="topbar">
     <div class="logo">
       <div class="logo-dot"></div>
       ArriveOnGreen
     </div>
 
-    <div class="mode-toggle">
-      <button class="mode-btn active" id="btn-sim" onclick="setMode('SIM')">Simulation</button>
-      <button class="mode-btn" id="btn-real" onclick="setMode('REAL')">Real GPS</button>
-    </div>
+    <button class="disclaimer-btn" onclick="openDisclaimer()">
+      Disclaimer
+    </button>
   </header>
 
-  <!-- HIDDEN SELECT FOR JS COMPAT -->
-  <select id="mode">
-    <option value="SIM">Simulation</option>
-    <option value="REAL">Real GPS</option>
-  </select>
+  <!-- hero -->
+  <main class="hero">
 
-  <!-- MAIN -->
-  <div class="main">
+    <div class="hero-badge">
+      Predictive Traffic Signal Navigation
+    </div>
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <h1 class="sidebar-heading">Where are<br>you <span>headed?</span></h1>
+    <h1>
+      Glide through lights on
+      <span>green.</span>
+    </h1>
 
-      <!-- search -->
-      <div class="search-wrap">
-        <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-          <circle cx="8.5" cy="8.5" r="5.5"/>
-          <path d="M13 13l3.5 3.5" stroke-linecap="round"/>
-        </svg>
-        <input id="search" type="text" placeholder="Search destination..." autocomplete="off" />
+    <p>
+      ArriveOnGreen predicts traffic light timing patterns to help optimise
+      your route and driving flow in real time.
+    </p>
+
+    <a href="#" class="start-btn" id="startBtn">
+      Start Navigating
+    </a>
+
+  </main>
+
+  <!-- disclaimer modal -->
+  <div class="modal-backdrop" id="modal-backdrop" onclick="closeDisclaimer()">
+
+    <div class="modal" onclick="event.stopPropagation()">
+
+      <div class="modal-header">
+        <h2>Disclaimer</h2>
+
+        <button class="close-btn" onclick="closeDisclaimer()">
+          ×
+        </button>
       </div>
 
-      <!-- destination card -->
-      <div class="dest-card" id="dest-card">
-        <div class="dest-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-            <circle cx="12" cy="9" r="2.5"/>
-          </svg>
-        </div>
-        <div class="dest-info">
-          <div class="dest-label">Destination</div>
-          <div class="dest-coords" id="dest-coords">No destination selected</div>
-        </div>
+      <div class="modal-content">
+
+        <p>
+          ArriveOnGreen provides predictive traffic signal estimations based
+          on available route, timing, and movement data.
+        </p>
+
+        <p>
+          Predictions may be inaccurate, delayed, incomplete, or incorrect.
+          Traffic light states can change dynamically due to traffic systems,
+          emergency vehicle priority, pedestrian crossings, road works,
+          weather, or other external factors.
+        </p>
+
+        <p>
+          This application is intended for informational and experimental
+          purposes only and must not be relied upon as an authoritative
+          navigation or traffic control system.
+        </p>
+
+        <p>
+          Drivers are solely responsible for obeying all traffic laws,
+          signals, signage, road markings, and local regulations at all
+          times, regardless of any prediction shown by the application.
+        </p>
+
+        <p>
+          By using ArriveOnGreen, you acknowledge that the developers,
+          contributors, and operators of the application are not liable for
+          any damages, losses, penalties, collisions, delays, or incidents
+          arising from the use of the software or reliance on its predictions.
+        </p>
+
+        <p>
+          Never operate a vehicle distracted. Always prioritise safe driving.
+        </p>
+
       </div>
 
-      <div class="divider"></div>
-
-      <!-- start -->
-      <button id="startBtn">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z"/>
-        </svg>
-        Start Navigation
-      </button>
-    </aside>
-
-    <!-- MAP -->
-    <div id="map"></div>
+    </div>
 
   </div>
 
-  <script>
-    function setMode(val) {
-      document.getElementById("mode").value = val;
-      document.getElementById("btn-sim").classList.toggle("active", val === "SIM");
-      document.getElementById("btn-real").classList.toggle("active", val === "REAL");
+  <script type="module">
+    import { auth } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    function openDisclaimer() {
+      document.getElementById("modal-backdrop").classList.add("show");
     }
 
-    // Patch setMarker to update new UI
-    const _origSetMarker = window.setMarker;
-
-    function updateDestCard(lat, lon) {
-      const card = document.getElementById("dest-card");
-      const coords = document.getElementById("dest-coords");
-      card.classList.add("has-dest");
-      coords.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    function closeDisclaimer() {
+      document.getElementById("modal-backdrop").classList.remove("show");
     }
-
-    // Hook into index.js setMarker after it loads
-    window.addEventListener("load", () => {
-      const orig = window.setMarker;
-      if (typeof orig === "function") {
-        window.setMarker = async function(lat, lon) {
-          await orig(lat, lon);
-          updateDestCard(lat, lon);
-        };
-      }
+  
+    document.getElementById("startBtn").addEventListener("click", () => {
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          window.location.href = "/route.html";
+        } else {
+          window.location.href = "/login.html";
+        }
+      });
     });
   </script>
 

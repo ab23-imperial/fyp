@@ -236,85 +236,147 @@ def advisory_from_delta(delta_to_start, delta_to_end):
         return "arrive_during_green"
     return "arrive_after_green"
   
-def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, window_index, speed_limit):
-    # convert to mph
+def compute_target_speed_mph(
+    distance_m,
+    signal,
+    t_mod,
+    current_speed_mps,
+    window_index,
+    speed_limit
+):
     current_mph = current_speed_mps * 2.23694
 
     g = signal["green"]
     a = signal["amber"]
     r = signal["red"]
+
     cycle = g + a + r
 
     candidate_speeds = []
 
-    # try multiple future cycles
-    for k in range(window_index-2, window_index+2):
-        green_start = (cycle - t_mod) + k * cycle
-        green_end = green_start + g
+    in_green = t_mod < g
 
-        # convert to speeds (m/s → mph)
-        v_min = distance_m / max(green_end, 0.1)
-        v_max = distance_m / max(green_start, 0.1)
+    for k in range(max(0, window_index - 2), window_index + 3):
 
-        mph_min = v_min * 2.23694
-        mph_max = v_max * 2.23694
-        print(f"min: {mph_min}, max: {mph_max}")
+        # ----------------------------------------
+        # CURRENT GREEN WINDOW
+        # ----------------------------------------
 
-        if mph_min <= mph_max and mph_min < speed_limit and mph_max < speed_limit:
-            candidate_speeds.append((mph_min, mph_max))
+        if k == 0 and in_green:
 
+            time_until_green_end = g - t_mod
+
+            slowest_mph = (
+                distance_m / max(time_until_green_end, 0.1)
+            ) * 2.23694
+
+            fastest_mph = speed_limit
+
+        # ----------------------------------------
+        # FUTURE GREEN WINDOWS
+        # ----------------------------------------
+
+        else:
+
+            if in_green:
+                green_start = (
+                    (g - t_mod) +     # finish current green
+                    a +
+                    r +
+                    (k - 1) * cycle
+                )
+            else:
+                green_start = (
+                    (cycle - t_mod) +
+                    k * cycle
+                )
+
+            green_end = green_start + g
+
+            fastest_mph = (
+                distance_m / max(green_start, 0.1)
+            ) * 2.23694
+
+            slowest_mph = (
+                distance_m / max(green_end, 0.1)
+            ) * 2.23694
+
+        print(
+            f"window={k} | "
+            f"slow={slowest_mph:.2f} | "
+            f"fast={fastest_mph:.2f}"
+        )
+
+        if (
+            slowest_mph <= fastest_mph
+            and slowest_mph <= speed_limit
+        ):
+
+            candidate_speeds.append({
+                "min": slowest_mph,
+                "max": min(fastest_mph, speed_limit),
+                "window": k
+            })
+                
     if not candidate_speeds:
         return None
+    print(candidate_speeds)
 
-    # -------- choose best speed --------
     best_speed = None
+    best_band = None
     best_cost = float("inf")
 
-    print(f"\nCURRENT = {current_mph:.2f}")
+    print(f"\nCURRENT = {current_mph:.2f} mph")
 
-    for k, (lo, hi) in enumerate(candidate_speeds):
-        slow_target = min(current_mph, hi)
-        fast_target = max(current_mph, lo)
+    # for band in candidate_speeds:
 
-        print(f"band {k}: lo={lo:.2f}, hi={hi:.2f}")
-        print(f"  slow_target={slow_target:.2f}, valid={lo <= slow_target <= hi}")
-        print(f"  fast_target={fast_target:.2f}, valid={lo <= fast_target <= hi}")
-        # # --- OPTION 1: slow down into band ---
-        # slow_target = min(current_mph, hi)
+    #     lo = band["min"]
+    #     hi = band["max"]
 
-        # # --- OPTION 2: speed up into band ---
-        # fast_target = max(current_mph, lo)
+    #     # option 1, stay slower
+    #     slow_target = min(current_mph, hi)
 
-        candidates = []
+    #     # option 2, speed up
+    #     fast_target = max(current_mph, lo)
 
-        # only valid if inside band
-        if lo <= slow_target <= hi:
-            candidates.append(("slow", slow_target))
+    #     candidates = []
 
-        if lo <= fast_target <= hi:
-            candidates.append(("fast", fast_target))
+    #     if lo <= slow_target <= hi:
+    #         candidates.append(("slow", slow_target))
 
-        for mode, target in candidates:
-            cost = abs(target - current_mph)
+    #     if lo <= fast_target <= hi:
+    #         candidates.append(("fast", fast_target))
 
-            # 🔑 directional bias
-            if mode == "fast":
-                cost *= 1   # penalise speeding
-            else:
-                cost *= 1   # slightly prefer slowing
+    #     print(
+    #         f"band: {lo:.1f} → {hi:.1f}"
+    #     )
 
-            # 🔑 penalise far future windows
-            # cost += k * 2.5
+    #     for mode, target in candidates:
 
-            # avoid crawling
-            if target < 8:
-                cost += 5
+    #         cost = abs(target - current_mph)
 
-            if cost < best_cost:
-                best_cost = cost
-                best_speed = target
+    #         print(
+    #             f"  {mode}: "
+    #             f"{target:.1f} mph | "
+    #             f"cost={cost:.2f}"
+    #         )
+
+    #         if cost < best_cost:
+    #             best_cost = cost
+    #             best_speed = target
+    #             best_band = band
                 
-    return best_speed
+    best_band = candidate_speeds[0]
+
+    if best_speed is None:
+        return None
+
+    return {
+        "target": best_speed,
+        "min": best_band["min"],
+        "max": best_band["max"],
+        "window": best_band["window"]
+    }
   
 def update_route_progress(state, route, lat, lon):
     idx = state["route_idx"]
@@ -519,15 +581,50 @@ def step_core(
               cycle = signal["green"] + signal["amber"] + signal["red"]
               phase_position = (arrival_time - T_g) % cycle
     
-    # --- NEW: target speed ---    
+    # ---------------- TARGET SPEED ----------------
+
+    target_mph = None
+    speed_band = None
+
     if advice == "arrive_during_green":
-        target_mph = speed * 2.23694
+
+        current_mph = speed * 2.23694
+
+        target_mph = current_mph
+
+        speed_band = {
+            "min": current_mph - 2,
+            "max": current_mph + 2,
+            "target": current_mph
+        }
 
     elif advice is not None:
-        target_mph = compute_target_speed_mph(distance, signal, t_mod, speed, window_index, speed_limit)
+
+        guidance = compute_target_speed_mph(
+            distance_m=distance,
+            signal=signal,
+            t_mod=t_mod,
+            current_speed_mps=speed,
+            window_index=window_index,
+            speed_limit=speed_limit
+        )
+
+        if guidance:
+            target_mph = guidance["target"]
+
+            speed_band = {
+                "min": guidance["min"],
+                "max": guidance["max"],
+                "target": guidance["target"]
+            }
 
     # ---------------- DEBUG ----------------
-    target_str = f"{target_mph:.1f}" if target_mph is not None else "None"
+
+    target_str = (
+        f"{target_mph:.1f}"
+        if target_mph is not None
+        else "None"
+    )
     print(
         f"dist={distance:.1f}m | "
         f"arr={arrival_time:.2f}s | "
@@ -557,4 +654,5 @@ def step_core(
         "signal_id": signal["id"],
         "target_speed_mph": target_mph,
         "current_speed_mph": speed * 2.23694,
+        "speed_band": speed_band,
     }

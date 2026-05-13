@@ -1,37 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <link rel="stylesheet" href="/drive.css">
-  <title>Signal Advisory</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Glide — Drive</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="drive.css">
 </head>
 <body>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- FAR VIEW: map -->
+  <div id="map"></div>
 
-<div id="map"></div>
-
-<div id="container">
-  <div id="signal-status">⚪</div>
-  <div id="road"></div>
-
-  <div id="overlay">
-    <!-- <div id="red1" class="segment"></div>
-    <div id="green" class="segment"></div>
-    <div id="red2" class="segment"></div> -->
+  <!-- MAP HUD (shown when on map) -->
+  <div id="map-hud">
+    <div id="advice-card-map" style="
+      background: rgba(10,10,14,0.85);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 14px 28px;
+      display: flex; align-items: center; gap: 16px;
+    ">
+      <div id="map-signal-dot" style="width:12px;height:12px;border-radius:50%;background:#888;flex-shrink:0;transition:background 0.3s;"></div>
+      <div style="font-family:'Space Grotesk',sans-serif;">
+        <div id="map-advice" style="font-size:18px;font-weight:600;letter-spacing:-0.01em;">Loading...</div>
+        <div id="map-text" style="font-size:13px;color:rgba(240,240,240,0.5);margin-top:2px;"></div>
+      </div>
+    </div>
   </div>
 
-  <img id="car" src="/ui/lib/car.png" />
+  <!-- NEAR VIEW: signal overlay -->
+  <div id="container">
+    <div id="road"></div>
+    <div id="overlay"></div>
+    <img id="car" src="/ui/lib/car.png" />
+
+    <div id="topbar">
+      <!-- <div id="signal-pill">
+        <div id="signal-dot"></div>
+        <span id="signal-label">Detecting...</span>
+      </div> -->
+      <div id="dist-pill"><span id="dist-val">—</span> m</div>
+    </div>
+  </div>
 
   <div id="hud">
-    <div id="advice">Loading...</div>
-    <div id="text"></div>
-    <!-- <div id="target" style="font-size: 18px; margin-top: 6px;"></div> -->
+    <div id="speedometer-wrap">
+      <svg id="speedometer" viewBox="0 0 300 180">
+    
+        <!-- background arc -->
+        <path
+          id="speed-arc-bg"
+          d=""
+          stroke="rgba(255,255,255,0.12)"
+          stroke-width="18"
+          fill="none"
+          stroke-linecap="round"
+        />
+    
+        <!-- green target arc -->
+        <path
+          id="speed-arc-target"
+          d=""
+          stroke="#4fffb0"
+          stroke-width="18"
+          fill="none"
+          stroke-linecap="round"
+        />
+    
+        <!-- needle -->
+        <line
+          id="needle"
+          x1="150"
+          y1="150"
+          x2="150"
+          y2="45"
+          stroke="white"
+          stroke-width="5"
+          stroke-linecap="round"
+        />
+    
+        <!-- centre -->
+        <circle
+          cx="150"
+          cy="150"
+          r="10"
+          fill="white"
+        />
+    
+      </svg>
+    
+      <div id="speed-readout">0 mph</div>
+    </div>
+    <!-- <div id="eta-strip">
+      <div class="eta-chip">ETA <b id="eta-val">—</b>s</div>
+    </div> -->
   </div>
-</div>
 
-<div id="text"></div>
-
-<script src="drive.js"></script>
+  <script type="module" src="drive.js"></script>
 </body>
 </html>

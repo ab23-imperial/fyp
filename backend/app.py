@@ -56,6 +56,14 @@ def home():
     phase_reports.clear()
 
     return send_from_directory("../frontend", "index.html")
+
+@app.route("/login")
+def login():
+    return send_from_directory("../frontend", "login.html")
+
+@app.route("/route")
+def route():
+    return send_from_directory("../frontend", "route.html")
   
 @app.route("/drive")
 def drive():
