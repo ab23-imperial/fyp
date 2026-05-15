@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="drive.css">
+  <link rel="stylesheet" href="drive_split.css">
 </head>
 <body>
 
@@ -49,6 +49,7 @@
       <div id="dist-pill"><span id="dist-val">—</span> m</div>
     </div>
   </div>
+  
 
   <div id="hud">
     <div id="speedometer-wrap">
@@ -58,7 +59,7 @@
         <path
           id="speed-arc-bg"
           d=""
-          stroke="rgba(255,255,255,0.12)"
+          stroke="rgba(255,255,255,0.18)"
           stroke-width="18"
           fill="none"
           stroke-linecap="round"
@@ -73,6 +74,9 @@
           fill="none"
           stroke-linecap="round"
         />
+
+        <!-- tick marks -->
+        <g id="ticks"></g>
     
         <!-- needle -->
         <line

@@ -37,6 +37,56 @@ let lastTime = performance.now();
 
 let map, routeLine, marker;
 
+// TICKS START
+
+const ticks = document.getElementById("ticks");
+
+const min = 0;
+const max = 80;
+const step = 5;
+
+const cx = 150;
+const cy = 150;
+const rOuter = 105;
+const rInner = 92;
+
+// gauge spans roughly -120deg to +120deg
+const startAngle = -210;
+const endAngle = 30;
+
+function degToRad(d) {
+  return (d * Math.PI) / 180;
+}
+
+function initTicks() {
+
+  for (let v = min; v <= max; v += step) {
+    const t = (v - min) / (max - min);
+    const angle = startAngle + t * (endAngle - startAngle);
+
+    const a = degToRad(angle);
+
+    const x1 = cx + Math.cos(a) * rInner;
+    const y1 = cy + Math.sin(a) * rInner;
+
+    const x2 = cx + Math.cos(a) * rOuter;
+    const y2 = cy + Math.sin(a) * rOuter;
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+
+    line.setAttribute("stroke", "rgba(255,255,255,0.40)");
+    line.setAttribute("stroke-width", v % 20 === 0 ? "2" : "1");
+
+    ticks.appendChild(line);
+  }
+}
+// TICKS END
+
 function initMap() {
   if (!route.length) return;
   if (typeof L === "undefined") return;
@@ -80,6 +130,7 @@ async function initWorld() {
       }).addTo(map);
     }
   }
+  initTicks();
 }
 
 async function initRoute(start, end) {
@@ -137,7 +188,6 @@ async function initFromGPS(endLat, endLon) {
 window.addEventListener("keydown", (e) => {
   if (e.key === "w") SPEED += 1/3.6;
   if (e.key === "s") SPEED = Math.max(0.1, SPEED - 1/3.6);
-  console.log("Speed:", SPEED);
 });
 
 function getPhoneLocation() {
@@ -453,7 +503,8 @@ function updateUI(data) {
     road.style.setProperty("--road-speed", `${duration}s`);
   }
 
-  const band = data?.speed_band;
+  const bandLo = data?.speed_band?.min;
+  const bandHi = data?.speed_band?.max;
   const current = data?.current_speed_mph ?? 0;
 
   const bgArc = document.getElementById("speed-arc-bg");
@@ -468,17 +519,14 @@ function updateUI(data) {
     );
   }
 
-  if (band && targetArc) {
+  if (bandLo != null && bandHi != null && targetArc) {
     targetArc.setAttribute(
-      "d",
-      describeArc(
-        150,
-        150,
-        100,
-        mphToAngle(band.min),
-        mphToAngle(band.max)
-      )
+        "d",
+        describeArc(150, 150, 100, mphToAngle(bandLo), mphToAngle(bandHi))
     );
+    targetArc.style.display = "";
+  } else if (targetArc) {
+      targetArc.style.display = "none";
   }
 
   if (needle) {

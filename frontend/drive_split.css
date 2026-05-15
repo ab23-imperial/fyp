@@ -390,6 +390,18 @@ html, body {
   overflow: visible;
 
   transform: translateY(-8%);
+
+  position: relative;
+  z-index: 1;
+}
+
+#speedometer line {
+  stroke-linecap: round;
+}
+
+#speedometer circle {
+  fill: #eaeef5;
+  opacity: 0.9;
 }
 
 /* background arc */
@@ -408,13 +420,10 @@ html, body {
 
 /* needle */
 #needle {
+  stroke: var(--accent);
   stroke-width: 4;
-
-  transition:
-    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
-
-  filter:
-    drop-shadow(0 0 10px rgba(255,255,255,0.3));
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  filter: drop-shadow(0 0 10px rgba(79,255,176,0.35));
 }
 
 /* speed text */
@@ -431,10 +440,11 @@ html, body {
   font-weight: 600;
   letter-spacing: -0.05em;
 
-  color: white;
+  color: #f5f7ff;
 
-  text-shadow:
-    0 0 24px rgba(255,255,255,0.14);
+  text-shadow: 0 0 24px rgba(255,255,255,0.12);
+
+  z-index: 2;
 }
 
 /* mobile */

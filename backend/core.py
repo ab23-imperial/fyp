@@ -236,147 +236,60 @@ def advisory_from_delta(delta_to_start, delta_to_end):
         return "arrive_during_green"
     return "arrive_after_green"
   
-def compute_target_speed_mph(
-    distance_m,
-    signal,
-    t_mod,
-    current_speed_mps,
-    window_index,
-    speed_limit
-):
+def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, window_index, speed_limit):
     current_mph = current_speed_mps * 2.23694
-
     g = signal["green"]
     a = signal["amber"]
     r = signal["red"]
-
     cycle = g + a + r
 
-    candidate_speeds = []
+    candidate_bands = []  # (lo, hi)
 
-    in_green = t_mod < g
-
-    for k in range(max(0, window_index - 2), window_index + 3):
-
-        # ----------------------------------------
-        # CURRENT GREEN WINDOW
-        # ----------------------------------------
-
-        if k == 0 and in_green:
-
-            time_until_green_end = g - t_mod
-
-            slowest_mph = (
-                distance_m / max(time_until_green_end, 0.1)
-            ) * 2.23694
-
-            fastest_mph = speed_limit
-
-        # ----------------------------------------
-        # FUTURE GREEN WINDOWS
-        # ----------------------------------------
-
+    for k in range(max(0, window_index - 1), window_index + 3):
+        if k == 0:
+            # currently in green — arrive before it ends
+            time_left = g - t_mod
+            if time_left <= 0:
+                continue
+            v_max = distance_m / max(time_left, 0.1)
+            v_min = 0.0
         else:
-
-            if in_green:
-                green_start = (
-                    (g - t_mod) +     # finish current green
-                    a +
-                    r +
-                    (k - 1) * cycle
-                )
-            else:
-                green_start = (
-                    (cycle - t_mod) +
-                    k * cycle
-                )
-
+            # future green window k
+            green_start = (cycle - t_mod) + (k - 1) * cycle
             green_end = green_start + g
+            if green_start <= 0:
+                continue
+            v_max = distance_m / max(green_start, 0.1)
+            v_min = distance_m / max(green_end, 0.1)
 
-            fastest_mph = (
-                distance_m / max(green_start, 0.1)
-            ) * 2.23694
+        mph_min = max(0, v_min * 2.23694)
+        mph_max = min(speed_limit, v_max * 2.23694)
 
-            slowest_mph = (
-                distance_m / max(green_end, 0.1)
-            ) * 2.23694
+        if mph_min <= mph_max:
+            candidate_bands.append((mph_min, mph_max))
 
-        print(
-            f"window={k} | "
-            f"slow={slowest_mph:.2f} | "
-            f"fast={fastest_mph:.2f}"
-        )
+    if not candidate_bands:
+        return None, None, None
 
-        if (
-            slowest_mph <= fastest_mph
-            and slowest_mph <= speed_limit
-        ):
-
-            candidate_speeds.append({
-                "min": slowest_mph,
-                "max": min(fastest_mph, speed_limit),
-                "window": k
-            })
-                
-    if not candidate_speeds:
-        return None
-    print(candidate_speeds)
-
+    # pick band closest to current speed
     best_speed = None
-    best_band = None
     best_cost = float("inf")
+    best_lo = None
+    best_hi = None
 
-    print(f"\nCURRENT = {current_mph:.2f} mph")
+    for lo, hi in candidate_bands:
+        # clamp current speed into band
+        target = max(lo, min(current_mph, hi))
+        cost = abs(target - current_mph)
+        if target < 8:
+            cost += 5
+        if cost <= best_cost:
+            best_cost = cost
+            best_speed = target
+            best_lo = lo
+            best_hi = hi
 
-    # for band in candidate_speeds:
-
-    #     lo = band["min"]
-    #     hi = band["max"]
-
-    #     # option 1, stay slower
-    #     slow_target = min(current_mph, hi)
-
-    #     # option 2, speed up
-    #     fast_target = max(current_mph, lo)
-
-    #     candidates = []
-
-    #     if lo <= slow_target <= hi:
-    #         candidates.append(("slow", slow_target))
-
-    #     if lo <= fast_target <= hi:
-    #         candidates.append(("fast", fast_target))
-
-    #     print(
-    #         f"band: {lo:.1f} → {hi:.1f}"
-    #     )
-
-    #     for mode, target in candidates:
-
-    #         cost = abs(target - current_mph)
-
-    #         print(
-    #             f"  {mode}: "
-    #             f"{target:.1f} mph | "
-    #             f"cost={cost:.2f}"
-    #         )
-
-    #         if cost < best_cost:
-    #             best_cost = cost
-    #             best_speed = target
-    #             best_band = band
-                
-    best_band = candidate_speeds[0]
-
-    if best_speed is None:
-        return None
-
-    return {
-        "target": best_speed,
-        "min": best_band["min"],
-        "max": best_band["max"],
-        "window": best_band["window"]
-    }
+    return best_speed, best_lo, best_hi
   
 def update_route_progress(state, route, lat, lon):
     idx = state["route_idx"]
@@ -597,25 +510,23 @@ def step_core(
             "max": current_mph + 2,
             "target": current_mph
         }
-
-    elif advice is not None:
-
-        guidance = compute_target_speed_mph(
+    elif advice is not None and window_index is not None:
+        result = compute_target_speed_mph(
             distance_m=distance,
             signal=signal,
             t_mod=t_mod,
             current_speed_mps=speed,
             window_index=window_index,
-            speed_limit=speed_limit
+            speed_limit=speed_limit or 80
         )
 
-        if guidance:
-            target_mph = guidance["target"]
+        target_mph, band_lo, band_hi = result[0], result[1], result[2]
 
+        if target_mph is not None:
             speed_band = {
-                "min": guidance["min"],
-                "max": guidance["max"],
-                "target": guidance["target"]
+                "min": band_lo,
+                "max": band_hi,
+                "target": target_mph
             }
 
     # ---------------- DEBUG ----------------

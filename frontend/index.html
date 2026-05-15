@@ -109,10 +109,7 @@
 
   </div>
 
-  <script type="module">
-    import { auth } from "./firebase.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
+  <script>
     function openDisclaimer() {
       document.getElementById("modal-backdrop").classList.add("show");
     }
@@ -120,6 +117,11 @@
     function closeDisclaimer() {
       document.getElementById("modal-backdrop").classList.remove("show");
     }
+  </script>
+
+  <script type="module">
+    import { auth } from "./firebase.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   
     document.getElementById("startBtn").addEventListener("click", () => {
       onAuthStateChanged(auth, (user) => {
