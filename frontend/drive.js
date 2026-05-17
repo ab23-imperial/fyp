@@ -37,6 +37,8 @@ let lastTime = performance.now();
 
 let map, routeLine, marker;
 
+let worldOffset = 0;
+
 // TICKS START
 
 const ticks = document.getElementById("ticks");
@@ -406,40 +408,77 @@ function updateUI(data) {
   const phaseColors = { green: "#4fffb0", amber: "#f59e0b", red: "#ef4444" };
   if (mapDot && phase) mapDot.style.background = phaseColors[phase] || "#888";
 
-  // ── OVERLAY GRADIENT ──
+  // ── OVERLAY GRADIENT (rectangle, repeating cycle) ──
   const amber = data?.amber_dur ?? 2;
   const redBefore = (data?.red_before_dur ?? 4) + 0.25 * amber;
   const green = (data?.green_dur ?? 8) + 0.5 * amber;
   const redAfter = (data?.red_after_dur ?? 4) + 0.25 * amber;
   const total = redBefore + green + redAfter;
-  const redPct = (redBefore / total) * 100;
-  const greenPct = (green / total) * 100;
-  const greenStart = redPct;
-  const greenEnd = redPct + greenPct;
 
-  const overlay = document.getElementById("overlay");
-  if (overlay) {
-    overlay.style.background = `linear-gradient(to bottom,
-      #c21111 0%,
-      #e68917 ${(greenStart * 0.6).toFixed(1)}%,
-      #2c7d29 ${greenStart.toFixed(1)}%,
-      #2c7d29 ${greenEnd.toFixed(1)}%,
-      #e68917 ${(greenEnd + (100 - greenEnd) * 0.4).toFixed(1)}%,
-      #c21111 100%
+  // build one full cycle as percentages within 0-100%
+  const r1End   = (redBefore / total) * 100;
+  const gStart  = r1End;
+  const gEnd    = gStart + (green / total) * 100;
+  const r2Start = gEnd;
+
+  const overlayEl = document.getElementById("overlay");
+  if (overlayEl) {
+    // paint 3 full cycles stacked so scrolling always shows colour
+    // each cycle = 33.33% of the 300% tall element
+    const c = 33.333;
+    const s = (pct) => pct / 3; // scale pct into one-third
+
+    overlayEl.style.background = `linear-gradient(to bottom,
+      #c21111        0%,
+      #e68917        ${s(r1End * 0.6).toFixed(2)}%,
+      #2c7d29        ${s(gStart).toFixed(2)}%,
+      #2c7d29        ${s(gEnd).toFixed(2)}%,
+      #e68917        ${s(r2Start + (100 - r2Start) * 0.4).toFixed(2)}%,
+      #c21111        ${c.toFixed(2)}%,
+
+      #c21111        ${c.toFixed(2)}%,
+      #e68917        ${(c + s(r1End * 0.6)).toFixed(2)}%,
+      #2c7d29        ${(c + s(gStart)).toFixed(2)}%,
+      #2c7d29        ${(c + s(gEnd)).toFixed(2)}%,
+      #e68917        ${(c + s(r2Start + (100 - r2Start) * 0.4)).toFixed(2)}%,
+      #c21111        ${(2 * c).toFixed(2)}%,
+
+      #c21111        ${(2 * c).toFixed(2)}%,
+      #e68917        ${(2 * c + s(r1End * 0.6)).toFixed(2)}%,
+      #2c7d29        ${(2 * c + s(gStart)).toFixed(2)}%,
+      #2c7d29        ${(2 * c + s(gEnd)).toFixed(2)}%,
+      #e68917        ${(2 * c + s(r2Start + (100 - r2Start) * 0.4)).toFixed(2)}%,
+      #c21111        100%
     )`;
   }
 
-  // ── CAR POSITION ──
+  // ── OVERLAY POSITION — scroll rectangle so car sits at right phase ──
   const containerEl = document.getElementById("container");
-  const car = document.getElementById("car");
   const delta = data?.delta_start;
-  if (delta != null && containerEl && car) {
-    const topBound = -redBefore;
+
+  if (delta != null && containerEl && overlayEl) {
+    const containerH = containerEl.clientHeight;
+    // overlay is 300% tall = 3x containerH
+    const overlayH = containerH * 3;
+    // one cycle height in px
+    const cycleH = overlayH / 3;
+
+    const topBound    = -redBefore;
     const bottomBound = green + redAfter;
-    const clamped = Math.max(topBound, Math.min(delta, bottomBound));
-    const ratio = (clamped - topBound) / (bottomBound - topBound);
-    const y = containerEl.clientHeight * ratio;
-    car.style.top = `${y - (car.clientHeight || 80) / 2}px`;
+    const clamped     = Math.max(topBound, Math.min(delta, bottomBound));
+    const ratio       = (clamped - topBound) / (bottomBound - topBound);
+
+    // where in one cycle (px) does this ratio land?
+    const posInCycle = ratio * cycleH;
+
+    // car is fixed at 70% of containerH
+    const carScreenY = containerH * 0.5;
+
+    // top of overlay = carScreenY - posInCycle
+    // start from middle cycle so there's room above and below
+    const overlayTop = carScreenY - cycleH - posInCycle;
+
+    overlayEl.style.top = `${overlayTop}px`;
   }
 
   // ── ADVICE ──

@@ -10,21 +10,19 @@
   --muted: rgba(240,240,240,0.45);
   --surface-glass: rgba(10,10,14,0.72);
   --border-glass: rgba(255,255,255,0.08);
+  --road-height: 72vh;
 }
 
 html, body {
   width: 100%; height: 100%;
   overflow: hidden;
-  background: #000;
+  background: #09090c;
   font-family: 'DM Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   color: var(--text);
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
 }
 
-/* ── MAP (far view) ── */
+/* ── MAP ── */
 #map {
   position: fixed;
   inset: 0;
@@ -32,26 +30,47 @@ html, body {
   display: none;
 }
 
-/* ── SIGNAL VIEW (near) ── */
+#map-hud {
+  position: fixed;
+  bottom: 0;
+  left: 0; right: 0;
+  padding: 0 20px calc(env(safe-area-inset-bottom) + 28px);
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+#map-hud.visible { display: flex; }
+
+/* ─────────────────────────────────────
+   ROAD SCENE — top 72vh
+   clip-path here = trapezium window
+   everything inside is a rectangle
+───────────────────────────────────── */
 #container {
   position: fixed;
-  height: 78vh;
-  inset: 0;
+  top: 0; left: 0; right: 0;
+  height: var(--road-height);
   z-index: 2;
   overflow: hidden;
-  background: #0d0d10;
+  background: #0d0d12;
+
+  /* trapezium clipping window — applied to the CONTAINER */
+  clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
 }
 
-/* ── ROAD ── */
+/* ── ROAD BACKGROUND — static rectangle ── */
 #road {
   position: absolute;
   inset: 0;
-  background: #1c1c22;
-  clip-path: polygon(28% 0%, 72% 0%, 100% 100%, 0% 100%);
+  background: #1a1a22;
   --road-speed: 2s;
+  z-index: 1;
 }
 
-/* road surface texture lines */
+/* subtle horizontal texture */
 #road::before {
   content: "";
   position: absolute;
@@ -59,72 +78,73 @@ html, body {
   background: repeating-linear-gradient(
     to bottom,
     transparent 0px,
-    transparent 38px,
-    rgba(255,255,255,0.03) 38px,
-    rgba(255,255,255,0.03) 40px
+    transparent 36px,
+    rgba(255,255,255,0.025) 36px,
+    rgba(255,255,255,0.025) 38px
   );
 }
 
-/* animated lane dashes */
+/* animated centre dashes — full rectangle, scrolls downward */
 #road::after {
   content: "";
   position: absolute;
   left: 50%;
   top: -200%;
   transform: translateX(-50%);
-  width: 6px;
+  width: 5px;
   height: 400%;
-
   background: repeating-linear-gradient(
     to bottom,
-    rgba(255,255,255,0.75) 0px,
-    rgba(255,255,255,0.75) 60px,
-    transparent 60px,
-    transparent 120px
+    rgba(255,255,255,0.7) 0px,
+    rgba(255,255,255,0.7) 55px,
+    transparent 55px,
+    transparent 110px
   );
-
   border-radius: 3px;
-
-  animation-name: roadMove;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-
+  animation: roadMove linear infinite;
   animation-duration: var(--road-speed, 2s);
+  z-index: 2;
 }
 
 @keyframes roadMove {
-  from {
-    transform: translateX(-50%) translateY(0);
-  }
-  to {
-    transform: translateX(-50%) translateY(240px);
-  }
+  from { transform: translateX(-50%) translateY(0); }
+  to   { transform: translateX(-50%) translateY(220px); }
 }
 
-/* ── SIGNAL COLOUR OVERLAY ── */
+/* ── OVERLAY — tall rectangle, scrolls via JS ── */
 #overlay {
   position: absolute;
-  inset: 0;
-  clip-path: polygon(28% 0%, 72% 0%, 100% 100%, 0% 100%);
-  opacity: 0.62;
-  transition: background 0.4s ease;
+  left: 0; right: 0;
+
+  /* 3x container height so there's always content above and below */
+  height: 300%;
+
+  /* start centred — JS will translate this */
+  top: -100%;
+
+  opacity: 0.6;
+  z-index: 3;
+  pointer-events: none;
+
+  /* no clip-path here — container handles the shape */
+  transition: top 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-/* ── CAR ── */
+/* ── CAR — fixed in place, world scrolls behind ── */
 #car {
   position: absolute;
-  width: 15%;
-  max-width: 80px;
-  min-width: 44px;
+  width: 14%;
+  max-width: 72px;
+  min-width: 40px;
   height: auto;
   left: 50%;
-  transform: translateX(-50%);
-  transition: top 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  filter: drop-shadow(0 4px 16px rgba(0,0,0,0.8));
-  z-index: 5;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 4px 20px rgba(0,0,0,0.9));
+  z-index: 10;
 }
 
-/* ── TOP BAR (signal status + distance) ── */
+/* ── TOP BAR ── */
 #topbar {
   position: absolute;
   top: 0;
@@ -135,40 +155,6 @@ html, body {
   justify-content: space-between;
   z-index: 10;
   pointer-events: none;
-}
-
-#signal-pill {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--surface-glass);
-  border: 1px solid var(--border-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 100px;
-  padding: 8px 16px 8px 12px;
-}
-
-#signal-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #888;
-  transition: background 0.3s, box-shadow 0.3s;
-  flex-shrink: 0;
-}
-
-#signal-dot.green  { background: #4fffb0; box-shadow: 0 0 10px rgba(79,255,176,0.6); }
-#signal-dot.amber  { background: #f59e0b; box-shadow: 0 0 10px rgba(245,158,11,0.6); }
-#signal-dot.red    { background: #ef4444; box-shadow: 0 0 10px rgba(239,68,68,0.6); }
-
-#signal-label {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text);
 }
 
 #dist-pill {
@@ -189,281 +175,140 @@ html, body {
   font-weight: 500;
 }
 
-/* ─────────────────────────────────────────
-   SPLIT SCREEN HUD REDESIGN
-   replaces your current #hud + #speedometer styles
-───────────────────────────────────────── */
-
-/* ─────────────────────────────────────────
-   ACTUAL SPLIT-SCREEN REDESIGN
-   this replaces the entire HUD concept
-───────────────────────────────────────── */
-
-/* speed advice card */
-#advice-card {
-  background: var(--surface-glass);
-  border: 1px solid var(--border-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 20px;
-  padding: 16px 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-width: 220px;
-  transition: border-color 0.3s;
-}
-
-#advice-card.up   { border-color: rgba(245,158,11,0.4); }
-#advice-card.down { border-color: rgba(79,255,176,0.4); }
-#advice-card.hold { border-color: rgba(255,255,255,0.12); }
-
-#advice {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(22px, 7vw, 40px);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  text-align: center;
-  line-height: 1;
-  transition: color 0.3s;
-}
-
-#advice.up   { color: var(--warn); }
-#advice.down { color: var(--accent); }
-#advice.hold { color: var(--text); }
-
-#advice-sub {
-  font-size: clamp(13px, 4vw, 17px);
-  color: var(--muted);
-  text-align: center;
-  font-weight: 400;
-}
-
-/* eta strip */
-#eta-strip {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.eta-chip {
-  background: var(--surface-glass);
-  border: 1px solid var(--border-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 100px;
-  padding: 7px 14px;
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  color: var(--muted);
-}
-
-.eta-chip b {
-  color: var(--text);
-  font-weight: 500;
-}
-
-/* ── MAP HUD overlay (shown when far from signal) ── */
-#map-hud {
+/* ─────────────────────────────────────
+   GLOWING DIVIDER
+───────────────────────────────────── */
+#divider {
   position: fixed;
-  bottom: 0;
+  top: var(--road-height);
   left: 0; right: 0;
-  padding: 0 20px calc(env(safe-area-inset-bottom) + 28px);
-  z-index: 10;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  pointer-events: none;
+  height: 1px;
+  z-index: 25;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(79,255,176,0.5) 20%,
+    rgba(79,255,176,0.95) 50%,
+    rgba(79,255,176,0.5) 80%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 10px rgba(79,255,176,0.5),
+    0 0 30px rgba(79,255,176,0.2);
+  animation: dividerPulse 4s ease-in-out infinite;
 }
 
-#map-hud.visible { display: flex; }
-
-
-/* ─────────────────────────────────────────
-   SPLIT SCREEN DASHBOARD
-───────────────────────────────────────── */
-
-/* top driving scene */
-#container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-
-  height: 78vh;
-  flex: 0 0 85%;
-
-  overflow: hidden;
-  z-index: 2;
-
-  background: #090a0d;
-
-  border-bottom:
-    1px solid rgba(255,255,255,0.06);
+@keyframes dividerPulse {
+  0%, 100% { opacity: 0.7; }
+  50%       { opacity: 1; }
 }
 
-/* bottom dashboard */
+/* ─────────────────────────────────────
+   HUD PANEL — bottom 28vh
+───────────────────────────────────── */
 #hud {
   position: fixed;
+  top: var(--road-height);
+  left: 0; right: 0;
   bottom: 0;
-  left: 0;
-  right: 0;
-
-  height: 22vh;
-  flex: 0 0 15%;
-
-  z-index: 20;
-
-  overflow: hidden;
+  z-index: 10;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  background:
-    linear-gradient(
-      to bottom,
-      #16181f 0%,
-      #0d0f14 100%
-    );
-
-  box-shadow:
-    0 -20px 60px rgba(0,0,0,0.65);
-
-  border-top:
-    1px solid rgba(255,255,255,0.06);
+  background: #09090c;
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow: hidden;
 }
 
-/* subtle dashboard glow */
+/* ambient glow */
 #hud::before {
   content: "";
-
   position: absolute;
   inset: 0;
-
-  background:
-    radial-gradient(
-      circle at center,
-      rgba(79,255,176,0.08),
-      transparent 60%
-    );
-
+  background: radial-gradient(
+    ellipse at center top,
+    rgba(79,255,176,0.07),
+    transparent 65%
+  );
   pointer-events: none;
 }
 
-/* separator glow line */
-#hud::after {
-  content: "";
-
-  position: absolute;
-  top: 0;
-  left: 15%;
-  width: 70%;
-  height: 2px;
-
-  background: rgba(79,255,176,0.7);
-
-  box-shadow:
-    0 0 18px rgba(79,255,176,0.5);
-}
-
-/* speedometer container */
+/* ── speedometer ── */
 #speedometer-wrap {
-  position: absolute;
-
-  width: 100%;
-  height: 100%;
-
-  transform: translateY(-5%);
-
+  width: min(90vw, 400px);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-}
-
-/* gauge */
-#speedometer {
-  width: min(110vw, 720px);
-
-  overflow: visible;
-
-  transform: translateY(-8%);
-
   position: relative;
-  z-index: 1;
+  transform: translateY(-20px);
 }
 
-#speedometer line {
-  stroke-linecap: round;
+#speedometer {
+  width: 100%;
+  overflow: visible;
 }
 
-#speedometer circle {
-  fill: #eaeef5;
-  opacity: 0.9;
-}
-
-/* background arc */
 #speed-arc-bg {
   stroke: rgba(255,255,255,0.08);
   stroke-width: 10;
 }
 
-/* active target band */
 #speed-arc-target {
   stroke-width: 14;
-
-  filter:
-    drop-shadow(0 0 10px rgba(79,255,176,0.5));
+  filter: drop-shadow(0 0 8px rgba(79,255,176,0.5));
+  transition: d 0.3s ease;
 }
 
-/* needle */
 #needle {
-  stroke: var(--accent);
+  stroke: white;
   stroke-width: 4;
-  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
-  filter: drop-shadow(0 0 10px rgba(79,255,176,0.35));
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(255,255,255,0.4));
 }
 
-/* speed text */
 #speed-readout {
-  position: absolute;
-
-  bottom: 18px;
-  left: 50%;
-
-  transform: translateX(-50%) translateY(16px);
-
   font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(42px, 8vw, 68px);
+  font-size: clamp(28px, 6vw, 42px);
   font-weight: 600;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.04em;
+  color: var(--text);
+  margin-top: -10px;
+  text-align: center;
+}
 
-  color: #f5f7ff;
+/* phase dot row */
+#phase-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
 
-  text-shadow: 0 0 24px rgba(255,255,255,0.12);
+#signal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #555;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+#signal-dot.green { background: #4fffb0; box-shadow: 0 0 10px rgba(79,255,176,0.7); }
+#signal-dot.amber { background: #f59e0b; box-shadow: 0 0 10px rgba(245,158,11,0.7); }
+#signal-dot.red   { background: #ef4444; box-shadow: 0 0 10px rgba(239,68,68,0.7); }
 
-  z-index: 2;
+#phase-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* mobile */
 @media (max-width: 700px) {
-
-  #container {
-    height: 72vh;
-  }
-
-  #hud {
-    height: 28vh;
-  }
-
-  #speedometer {
-    width: 130vw;
-  }
-
-  #speed-readout {
-    bottom: 20px;
-    font-size: 52px;
-  }
+  #container { height: 72vh; }
+  #divider   { top: 72vh; }
+  #hud       { top: 72vh; }
 }
