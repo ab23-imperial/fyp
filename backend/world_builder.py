@@ -50,6 +50,7 @@ def get_signals(route):
 
     for attempt in range(3):  # reduced retries
         for url in urls:
+            print(f"trying url {url}")
             try:
                 r = SESSION.post(url, data=query, timeout=30)
 

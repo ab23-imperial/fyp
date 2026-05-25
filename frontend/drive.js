@@ -39,6 +39,37 @@ let map, routeLine, marker;
 
 let worldOffset = 0;
 
+const mapShell = document.getElementById("map-shell");
+const mapToggle = document.getElementById("map-toggle");
+
+// click map preview to expand
+mapShell.addEventListener("click", () => {
+  if (mapShell.classList.contains("mini")) {
+    mapShell.classList.remove("mini");
+    mapShell.classList.add("full");
+
+    if (map) {
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 500);
+    }
+  }
+});
+
+// click button to minimise
+mapToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+
+  mapShell.classList.remove("full");
+  mapShell.classList.add("mini");
+
+  if (map) {
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 500);
+  }
+});
+
 // TICKS START
 
 const ticks = document.getElementById("ticks");
@@ -89,6 +120,18 @@ function initTicks() {
 }
 // TICKS END
 
+function computeHeading(lat1, lon1, lat2, lon2) {
+  const toRad = d => d * Math.PI / 180;
+  const toDeg = r => r * 180 / Math.PI;
+
+  const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
 function initMap() {
   if (!route.length) return;
   if (typeof L === "undefined") return;
@@ -98,7 +141,7 @@ function initMap() {
   map = L.map("map").setView(first, 16);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap"
+    // attribution: "© OpenStreetMap"
   }).addTo(map);
 
   // draw route
@@ -121,15 +164,18 @@ async function initWorld() {
 
   routeIndex = 0;
   [lat, lon] = route[0];
+  const signalIcon = L.divIcon({
+    className: "signal-marker",
+    html: `<div class="signal-dot"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6]
+  });
 
   console.log("World loaded, route points:", route.length);
   if (USE_MAP) initMap();
   if (typeof L !== "undefined" && map) {
     for (const s of data.signals) {
-      L.circleMarker([s.lat, s.lon], {
-        radius: 5,
-        color: "red"
-      }).addTo(map);
+      L.marker([s.lat, s.lon], { icon: signalIcon }).addTo(map);
     }
   }
   initTicks();
@@ -244,7 +290,7 @@ function moveTowards(targetLat, targetLon, speed, dt) {
 
   const dist = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  console.log(dist)
+  // console.log(dist)
 
   if (dist < 0.5) return;
 
@@ -376,22 +422,23 @@ async function loop() {
 }
 
 function updateUI(data) {
+  // console.log(data)
   const distance = data?.distance ?? 9999;
   const mapEl = document.getElementById("map");
   const container = document.getElementById("container");
   const mapHud = document.getElementById("map-hud");
 
-  // ── VIEW SWITCHING ──
-  if (distance > 2000) {
-    if (mapEl) mapEl.style.display = "block";
-    if (container) container.style.display = "none";
-    if (mapHud) mapHud.classList.add("visible");
-    if (window._leafletMap) setTimeout(() => window._leafletMap.invalidateSize(), 50);
-  } else {
-    if (mapEl) mapEl.style.display = "none";
-    if (container) container.style.display = "block";
-    if (mapHud) mapHud.classList.remove("visible");
-  }
+  // // ── VIEW SWITCHING ──
+  // if (distance > 2000) {
+  //   if (mapEl) mapEl.style.display = "block";
+  //   if (container) container.style.display = "none";
+  //   if (mapHud) mapHud.classList.add("visible");
+  //   if (window._leafletMap) setTimeout(() => window._leafletMap.invalidateSize(), 50);
+  // } else {
+  //   if (mapEl) mapEl.style.display = "none";
+  //   if (container) container.style.display = "block";
+  //   if (mapHud) mapHud.classList.remove("visible");
+  // }
 
   // ── SIGNAL DOT ──
   const phase = data?.phase;
@@ -542,43 +589,81 @@ function updateUI(data) {
     road.style.setProperty("--road-speed", `${duration}s`);
   }
 
-  const bandLo = data?.speed_band?.min;
-  const bandHi = data?.speed_band?.max;
-  const current = data?.current_speed_mph ?? 0;
-
+  const speedBands = data?.speed_bands ?? [];
   const bgArc = document.getElementById("speed-arc-bg");
   const targetArc = document.getElementById("speed-arc-target");
   const needle = document.getElementById("needle");
   const readout = document.getElementById("speed-readout");
+  const svg = document.getElementById("speedometer");
 
+  // redraw bg arc (always full red)
   if (bgArc) {
-    bgArc.setAttribute(
-      "d",
-      describeArc(150, 150, 100, -120, 120)
-    );
+      bgArc.setAttribute("d", describeArc(150, 150, 100, -120, 120));
+      bgArc.setAttribute("stroke", "#c21111");
+      bgArc.setAttribute("stroke-width", "14");
   }
 
-  if (bandLo != null && bandHi != null && targetArc) {
-    targetArc.setAttribute(
-        "d",
-        describeArc(150, 150, 100, mphToAngle(bandLo), mphToAngle(bandHi))
-    );
-    targetArc.style.display = "";
-  } else if (targetArc) {
-      targetArc.style.display = "none";
-  }
+  // remove old band arcs
+  svg.querySelectorAll(".band-arc, .band-arc-amber").forEach(el => el.remove());
+
+  // draw green + amber bands for each valid window
+  const AMBER_MARGIN = 0.5; // mph of uncertainty either side
+
+  speedBands.forEach(band => {
+      const lo = band.lo;
+      const hi = band.hi;
+      const ab = 0.04737 * (hi - lo) + 0.10526
+
+      // amber uncertainty margins
+      const amberLo1 = Math.max(0, lo - ab);
+      const amberHi2 = Math.min(80, hi + ab);
+
+      // lower amber
+      if (amberLo1 < lo) {
+          const amberArcLo = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          amberArcLo.setAttribute("stroke-linecap", "butt");
+          amberArcLo.setAttribute("d", describeArc(150, 150, 100, mphToAngle(amberLo1), mphToAngle(lo + ab / 2)));
+          amberArcLo.setAttribute("stroke", "#e68917");
+          amberArcLo.setAttribute("stroke-width", "14");
+          amberArcLo.setAttribute("fill", "none");
+          amberArcLo.setAttribute("stroke-linecap", "round");
+          amberArcLo.classList.add("band-arc-amber");
+          svg.insertBefore(amberArcLo, needle);
+      }
+
+      // upper amber
+      if (amberHi2 > hi) {
+        const amberArcHi = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        amberArcHi.setAttribute("d", describeArc(150, 150, 100, mphToAngle(hi - ab / 2), mphToAngle(amberHi2)));
+        amberArcHi.setAttribute("stroke-linecap", "butt");
+        amberArcHi.setAttribute("stroke", "#e68917");
+        amberArcHi.setAttribute("stroke-width", "14");
+        amberArcHi.setAttribute("fill", "none");
+        amberArcHi.setAttribute("stroke-linecap", "round");
+        amberArcHi.classList.add("band-arc-amber");
+        svg.insertBefore(amberArcHi, needle);
+      }
+
+      // green band
+      const greenArc = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      greenArc.setAttribute("d", describeArc(150, 150, 100, mphToAngle(lo + ab / 2), mphToAngle(hi - ab / 2)));
+      greenArc.setAttribute("stroke", "#2c7d29");
+      greenArc.setAttribute("stroke-width", "14");
+      greenArc.setAttribute("fill", "none");
+      greenArc.setAttribute("stroke-linecap", "round");
+      greenArc.style.filter = "drop-shadow(0 0 6px rgba(79,255,176,0.6))";
+      greenArc.classList.add("band-arc");
+      svg.insertBefore(greenArc, needle);
+  });
+
+  // hide the old single target arc
+  if (targetArc) targetArc.style.display = "none";
 
   if (needle) {
-    const angle = mphToAngle(current);
-
-    needle.setAttribute(
-      "transform",
-      `rotate(${angle} 150 150)`
-    );
+      needle.setAttribute("transform", `rotate(${mphToAngle(currentMph)} 150 150)`);
   }
-
   if (readout) {
-    readout.textContent = `${Math.round(current)} mph`;
+      readout.textContent = `${Math.round(currentMph)} mph`;
   }
 };
 

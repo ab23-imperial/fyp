@@ -115,7 +115,9 @@ def get_nearest_signal(lat, lon):
 def get_active_signal(state, signals):
     idx = state.get("active_signal_idx", 0)
     idx = min(idx, len(signals) - 1)
-
+    if idx < 0 or idx >= len(signals):
+        print(f"IDX: {idx}")
+        idx = 0
     current = signals[idx]
 
     route_idx = state.get("route_idx", 0)
@@ -290,6 +292,38 @@ def compute_target_speed_mph(distance_m, signal, t_mod, current_speed_mps, windo
             best_hi = hi
 
     return best_speed, best_lo, best_hi
+
+def compute_all_bands(distance_m, signal, t_mod, speed_limit):
+    """Returns all valid green windows as (lo, hi) mph bands."""
+    g = signal["green"]
+    a = signal["amber"]
+    r = signal["red"]
+    cycle = g + a + r
+
+    bands = []
+
+    for k in range(0, 5):  # check up to 5 future windows
+        if k == 0:
+            time_left = g - t_mod
+            if time_left <= 0:
+                continue
+            v_min = distance_m / max(time_left, 0.1)
+            v_max = speed_limit
+        else:
+            green_start = (cycle - t_mod) + (k - 1) * cycle
+            green_end = green_start + g
+            if green_start <= 0:
+                continue
+            v_max = distance_m / max(green_start, 0.1)
+            v_min = distance_m / max(green_end, 0.1)
+
+        mph_min = max(0, v_min * 2.23694)
+        mph_max = min(speed_limit, v_max * 2.23694)
+
+        if mph_min <= mph_max and mph_max > 5:
+            bands.append({"lo": round(mph_min, 1), "hi": round(mph_max, 1)})
+
+    return bands
   
 def update_route_progress(state, route, lat, lon):
     idx = state["route_idx"]
@@ -528,6 +562,10 @@ def step_core(
                 "max": band_hi,
                 "target": target_mph
             }
+            
+    all_bands = compute_all_bands(
+        distance, signal, t_mod, speed_limit or 80
+    ) if distance > 0 else []
 
     # ---------------- DEBUG ----------------
 
@@ -545,7 +583,9 @@ def step_core(
         f"Δend={delta_end} | "
         f"{state.get('current_phase')} | "
         f"{advice} | "
-        f"curr={speed*2.23694:.1f}mph → target={target_str}"
+        f"curr={speed*2.23694:.1f}mph → target={target_str} | "
+        f"tmod={t_mod} | "
+        f"all bands: {all_bands}"
     )
 
     return {
@@ -566,4 +606,5 @@ def step_core(
         "target_speed_mph": target_mph,
         "current_speed_mph": speed * 2.23694,
         "speed_band": speed_band,
+        "speed_bands": all_bands,
     }

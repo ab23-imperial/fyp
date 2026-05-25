@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from collections import deque
 import time
 import cv2
+import requests
 
 from core import step_core, init_world
 from world_builder import build_world
@@ -14,7 +15,7 @@ logger = PhaseLogger()
 # ---------------- WORLD (single source of truth) ----------------
 # route, signals = init_world()
 
-SPEED_LIMIT = 35
+SPEED_LIMIT = 40
 
 world = {}
 
@@ -178,7 +179,6 @@ def gps():
     )
 
     return jsonify(result)
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050)
