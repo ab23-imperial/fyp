@@ -15,6 +15,12 @@
 
   <script type="module" src="route.js"></script>
   <link rel="stylesheet" href="route.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#09090c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ArriveOnGreen">
+  <link rel="apple-touch-icon" href="/icon.svg">
 </head>
 
 <body>
@@ -100,5 +106,6 @@
     }
   </script>
 
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
 </body>
 </html>

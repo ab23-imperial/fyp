@@ -1,13 +1,11 @@
 import requests
 import folium
-import random
-import time
 
 WORLD_CACHE = {}
 
 # ---------------- HEADERS ----------------
 HEADERS = {
-    "User-Agent": "traffic-advisory-app/1.0 (contact: youremail@example.com)"
+    "User-Agent": "traffic-advisory-app/1.0 (contact: agastya.bahl2004@gmail.com)"
 }
 
 SESSION = requests.Session()
@@ -15,20 +13,45 @@ SESSION.headers.update(HEADERS)
 
 
 # ---------------- ROUTE ----------------
+_DEFAULT_SPEED_LIMIT_MPH = 30
+
+def _parse_maxspeed(entry):
+    if not entry or "speed" not in entry:
+        return None
+    speed = entry["speed"]
+    unit  = entry.get("unit", "km/h")
+    return round(speed if unit == "mph" else speed / 1.60934)
+
+
 def get_route(start, end):
-    url = (
+    base = (
         "http://router.project-osrm.org/route/v1/driving/"
         f"{start[1]},{start[0]};{end[1]},{end[0]}"
         "?overview=full&geometries=geojson"
     )
 
-    r = SESSION.get(url, timeout=20)
-    r.raise_for_status()
+    for url in [base + "&annotations=maxspeed", base]:
+        r = SESSION.get(url, timeout=20)
+        if r.status_code == 400 and "annotations" in url:
+            continue
+        r.raise_for_status()
+        break
 
-    data = r.json()
-    coords = data["routes"][0]["geometry"]["coordinates"]
+    data       = r.json()
+    route_data = data["routes"][0]
+    coords     = route_data["geometry"]["coordinates"]
+    route      = [(c[1], c[0]) for c in coords]
 
-    return [(c[1], c[0]) for c in coords]
+    try:
+        raw = route_data["legs"][0]["annotation"]["maxspeed"]
+        speed_limits = [(_parse_maxspeed(e) or _DEFAULT_SPEED_LIMIT_MPH) for e in raw]
+    except (KeyError, TypeError):
+        speed_limits = []
+
+    expected     = max(len(route) - 1, 0)
+    speed_limits = (speed_limits + [_DEFAULT_SPEED_LIMIT_MPH] * expected)[:expected]
+
+    return route, speed_limits
 
 
 # ---------------- SIGNALS ----------------
@@ -36,48 +59,33 @@ def get_signals(route):
     lats = [p[0] for p in route]
     lons = [p[1] for p in route]
 
-    query = f"""
-    [out:json][timeout:25];
-    node["highway"="traffic_signals"]
-    ({min(lats)-0.01},{min(lons)-0.01},{max(lats)+0.01},{max(lons)+0.01});
-    out;
-    """
+    south = min(lats) - 0.01
+    west  = min(lons) - 0.01
+    north = max(lats) + 0.01
+    east  = max(lons) + 0.01
 
-    urls = [
+    # Request full tags so we can read timing data
+    query = (
+        f"[out:json][timeout:30];"
+        f'node["highway"="traffic_signals"]({south},{west},{north},{east});'
+        f"out body;"
+    )
+
+    r = SESSION.post(
         "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-    ]
-
-    for attempt in range(3):  # reduced retries
-        for url in urls:
-            print(f"trying url {url}")
-            try:
-                r = SESSION.post(url, data=query, timeout=30)
-
-                if r.status_code == 200:
-                    data = r.json()
-                    return [(n["lat"], n["lon"]) for n in data.get("elements", [])]
-
-                # 429 / 406 / 5xx handling
-                if r.status_code in (406, 429, 500, 502, 503):
-                    print(f"Overpass busy ({r.status_code}) → retrying...")
-                    continue
-
-                print(f"Overpass fail {r.status_code}")
-            except Exception as e:
-                print("Overpass error:", e)
-
-        # exponential backoff
-        time.sleep(2 ** attempt)
-
-    return []
+        data={"data": query},
+        timeout=35,
+    )
+    r.raise_for_status()
+    return r.json().get("elements", [])
 
 
 # ---------------- MATCH ----------------
 def match_signals(route, signals, radius=5):
     out = []
     for s in signals:
-        dist = min(haversine(s, p) for p in route)
+        coord = (s["lat"], s["lon"])
+        dist = min(haversine(coord, p) for p in route)
         if dist < radius:
             out.append(s)
     return out
@@ -98,19 +106,63 @@ def haversine(a, b):
 
 
 # ---------------- TIMINGS ----------------
+_DEFAULT_GREEN = 30
+_DEFAULT_AMBER = 3
+_DEFAULT_RED   = 30
+
+def _parse_seconds(val, default):
+    """Parse an OSM tag value like "30" or "30 s" to an integer number of seconds."""
+    if val is None:
+        return default
+    try:
+        return max(1, int(float(str(val).strip().rstrip("s").strip())))
+    except (ValueError, TypeError):
+        return default
+
+
 def attach_timings(signals, route):
-    return [
-        {
+    result = []
+    for i, node in enumerate(signals, start=1):
+        tags = node.get("tags", {})
+
+        green = _parse_seconds(
+            tags.get("traffic_signals:green") or tags.get("green_duration"),
+            _DEFAULT_GREEN
+        )
+        amber = _parse_seconds(
+            tags.get("traffic_signals:amber") or tags.get("amber_duration"),
+            _DEFAULT_AMBER
+        )
+        red = _parse_seconds(
+            tags.get("traffic_signals:red") or tags.get("red_duration"),
+            _DEFAULT_RED
+        )
+
+        # If only cycle_time is available, split remaining time evenly between green/red
+        cycle_time = _parse_seconds(tags.get("cycle_time"), None)
+        if cycle_time and cycle_time > amber:
+            if green == _DEFAULT_GREEN and red == _DEFAULT_RED:
+                remaining = cycle_time - amber
+                green = remaining // 2
+                red   = remaining - green
+
+        osm_timing = any(
+            k in tags for k in ("traffic_signals:green", "traffic_signals:red", "cycle_time")
+        )
+        source = "osm" if osm_timing else "default"
+        print(f"  Signal {i}: {source} timings  g={green}s  a={amber}s  r={red}s")
+
+        result.append({
             "id": i,
-            "lat": s[0],
-            "lon": s[1],
-            "route_idx": find_closest_route_index(s, route),
-            "green": random.randint(15, 60),
-            "amber": 2,
-            "red": random.randint(15, 60),
-        }
-        for i, s in enumerate(signals, start=1)
-    ]
+            "lat": node["lat"],
+            "lon": node["lon"],
+            "route_idx": find_closest_route_index((node["lat"], node["lon"]), route),
+            "green": green,
+            "amber": amber,
+            "red":   red,
+        })
+    return result
+
 
 def find_closest_route_index(signal, route):
     best_idx = 0
@@ -135,15 +187,16 @@ def build_world(start, end):
     if key in WORLD_CACHE:
         return WORLD_CACHE[key]
 
-    route = get_route(start, end)
+    route, speed_limits = get_route(start, end)
     raw = get_signals(route)
     matched = match_signals(route, raw)
     signals = attach_timings(matched, route)
-    signals.sort(key=lambda s: s["route_idx"])   # 👈 ADD THIS
+    signals.sort(key=lambda s: s["route_idx"])
 
-    WORLD_CACHE[key] = (route, signals)
+    WORLD_CACHE[key] = (route, signals, speed_limits)
     render_map(route, signals)
-    return route, signals
+    return route, signals, speed_limits
+
   
 def render_map(route, signals):
     center = route[len(route)//2]

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Vision Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #09090c;
+      color: #f0f0f0;
+      font-family: 'Space Grotesk', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 24px;
+    }
+    h1 { font-size: 16px; font-weight: 400; color: rgba(240,240,240,0.5); letter-spacing: 0.08em; text-transform: uppercase; }
+    #camera-wrap {
+      position: relative;
+      width: min(90vw, 480px);
+      border-radius: 16px;
+      overflow: hidden;
+      border: 3px solid rgba(255,255,255,0.08);
+      transition: border-color 0.4s, box-shadow 0.4s;
+    }
+    #camera-wrap.green { border-color: #2c7d29; box-shadow: 0 0 40px rgba(44,125,41,0.45); }
+    #camera-wrap.amber { border-color: #e68917; box-shadow: 0 0 40px rgba(230,137,23,0.45); }
+    #camera-wrap.red   { border-color: #c21111; box-shadow: 0 0 40px rgba(194,17,17,0.45); }
+    video { width: 100%; display: block; }
+    #phase-label {
+      font-size: 32px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: rgba(240,240,240,0.35);
+      min-height: 44px;
+      transition: color 0.4s;
+    }
+    #phase-label.green { color: #4fffb0; }
+    #phase-label.amber { color: #f59e0b; }
+    #phase-label.red   { color: #ef4444; }
+    #confidence { font-size: 13px; color: rgba(240,240,240,0.3); min-height: 20px; }
+    #status     { font-size: 12px; color: rgba(240,240,240,0.25); }
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Signal Detection Test</h1>
+  <div id="camera-wrap">
+    <video id="vid" autoplay playsinline muted></video>
+  </div>
+  <div id="phase-label">—</div>
+  <div id="confidence"></div>
+  <div id="status">Starting camera…</div>
+  <canvas id="c"></canvas>
+  <script>
+    const vid    = document.getElementById("vid");
+    const canvas = document.getElementById("c");
+    const ctx    = canvas.getContext("2d");
+    const wrap   = document.getElementById("camera-wrap");
+    const label  = document.getElementById("phase-label");
+    const conf   = document.getElementById("confidence");
+    const status = document.getElementById("status");
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => {
+        vid.srcObject = stream;
+        status.textContent = "Camera active — detecting every 800 ms";
+      })
+      .catch(e => { status.textContent = "Camera error: " + e.message; });
+
+    async function detect() {
+      if (!vid.videoWidth) return;
+      canvas.width  = 320;
+      canvas.height = Math.round(vid.videoHeight * (320 / vid.videoWidth));
+      ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+      const b64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
+      try {
+        const res  = await fetch("/detect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ frame_b64: b64 })
+        });
+        const data = await res.json();
+        const phase = data.phase || "unknown";
+        const pct   = data.confidence != null ? Math.round(data.confidence * 100) : null;
+        wrap.className  = ["green","amber","red"].includes(phase) ? phase : "";
+        label.className = ["green","amber","red"].includes(phase) ? phase : "";
+        label.textContent = phase.toUpperCase();
+        conf.textContent  = pct != null ? "confidence " + pct + "%" : "";
+      } catch(e) { status.textContent = "Detection error: " + e.message; }
+    }
+
+    setInterval(detect, 800);
+  </script>
+</body>
+</html>

@@ -441,17 +441,13 @@ def step_core(
 
     # ---------------- VISION ----------------
     if use_vision and frame is not None:
-        elapsed = now - state.get("start_wall", now)
-
-        if elapsed - state.get("last_sample_time", 0) >= DETECT_INTERVAL:
-            state["last_sample_time"] = elapsed
-            _, buf = cv2.imencode(".jpg", frame)
-            result = detect_signal(buf.tobytes())
+        # Frontend throttles to 1 frame/s, so always process when frame arrives
+        _, buf = cv2.imencode(".jpg", frame)
+        result = detect_signal(buf.tobytes())
+        if result.state != "unknown":
             state_buffer.append(result.state)
-
         vision_phase = stable_state(state_buffer)
     else:
-        # fallback (can swap to random later)
         t = now - state["signal_start_time"]
         vision_phase = get_true_phase(signal, t)
 
@@ -473,6 +469,17 @@ def step_core(
         state["current_phase"] = layer2_phase
         state["phase_start_time"] = now
 
+        # Anchor the cycle clock from what the camera actually sees
+        if use_vision:
+            g, a = signal["green"], signal["amber"]
+            if layer2_phase == "green":
+                state["signal_start_time"] = now
+            elif layer2_phase == "amber":
+                state["signal_start_time"] = now - g
+            else:
+                state["signal_start_time"] = now - g - a
+            print(f"Vision anchored cycle: phase={layer2_phase} signal_id={signal['id']}")
+
         logger.log(
             signal_id=signal["id"],
             phase=layer2_phase,
@@ -485,6 +492,7 @@ def step_core(
     delta_start = None
     delta_end = None
     phase_position = None
+    advice = None
 
     if state.get("current_phase") and state.get("phase_start_time"):
         t = now - state["signal_start_time"]
@@ -603,6 +611,8 @@ def step_core(
         "red_before_dur": signal["red"],
         "red_after_dur": signal["red"],
         "signal_id": signal["id"],
+        "signal_route_idx": signal["route_idx"],
+        "t_mod": t_mod,
         "target_speed_mph": target_mph,
         "current_speed_mph": speed * 2.23694,
         "speed_band": speed_band,

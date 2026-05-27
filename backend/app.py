@@ -1,7 +1,10 @@
 from flask import Flask, request, jsonify, send_from_directory
 from collections import deque
 import time
+import base64
+import socket
 import cv2
+import numpy as np
 import requests
 
 from core import step_core, init_world
@@ -58,6 +61,10 @@ def home():
 
     return send_from_directory("../frontend", "index.html")
 
+@app.route("/signup")
+def signup():
+    return send_from_directory("../frontend", "signup.html")
+
 @app.route("/login")
 def login():
     return send_from_directory("../frontend", "login.html")
@@ -90,15 +97,14 @@ def init_route():
 
     print(f"INIT ROUTE: start={start}, end={end}")
 
-    route, signals = build_world(start, end)
+    route, signals, speed_limits = build_world(start, end)
 
-    # update world
     world["route"] = route
     world["signals"] = signals
+    world["speed_limits"] = speed_limits
 
     print("UPDATED WORLD:", world)
 
-    # reset state
     global state
     state = reset_state()
     state_buffer.clear()
@@ -126,15 +132,14 @@ def init_from_gps():
 
     print(f"GPS INIT: start={start}, end={end}")
 
-    route, signals = build_world(start, end)
+    route, signals, speed_limits = build_world(start, end)
 
-    # ✅ update single source of truth
     world["route"] = route
     world["signals"] = signals
+    world["speed_limits"] = speed_limits
 
     print("UPDATED WORLD:", world)
 
-    # ✅ reset runtime state to match new signals
     global state
     state = reset_state()
     state_buffer.clear()
@@ -151,34 +156,91 @@ def gps():
     data = request.json
 
     now = time.time()
-    elapsed = now - start_wall
 
-    frame_idx = int(elapsed * video_fps)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+    # Prefer live camera frame from phone; fall back to test video
+    frame_b64 = data.get("frame_b64")
+    if frame_b64:
+        img_bytes = base64.b64decode(frame_b64)
+        img_arr   = np.frombuffer(img_bytes, np.uint8)
+        frame     = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+        use_cam   = frame is not None
+    else:
+        elapsed   = now - start_wall
+        frame_idx = int(elapsed * video_fps)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ret, frame = cap.read()
+        if not ret:
+            frame = None
+        use_cam = False
 
-    ret, frame = cap.read()
-    if not ret:
-        frame = None
+    route_idx = data.get("route_idx") or 0
+    speed_limits = world.get("speed_limits", [])
+    if speed_limits and 0 <= route_idx < len(speed_limits):
+        speed_limit = speed_limits[route_idx]
+    else:
+        speed_limit = SPEED_LIMIT
 
     result = step_core(
         state,
         state_buffer,
         phase_reports,
-        world["signals"],          # ✅ always latest signals
-        route=world["route"],     # ✅ always latest route
+        world["signals"],
+        route=world["route"],
         now=now,
         speed=data.get("speed", 12.5),
         lat=data.get("lat"),
         lon=data.get("lon"),
         frame=frame,
-        use_vision=False,
+        use_vision=use_cam,
         do_mock_reports=False,
         logger=logger,
         route_idx=data.get("route_idx"),
-        speed_limit=SPEED_LIMIT
+        speed_limit=speed_limit
     )
 
     return jsonify(result)
 
+@app.route("/vision")
+def vision_page():
+    return send_from_directory("../frontend", "vision.html")
+
+
+@app.route("/detect", methods=["POST"])
+def detect():
+    from vision.detector import detect_signal
+    data = request.json or {}
+    frame_b64 = data.get("frame_b64", "")
+    if not frame_b64:
+        return jsonify({"phase": "unknown"})
+    img_bytes = base64.b64decode(frame_b64)
+    img_arr   = np.frombuffer(img_bytes, np.uint8)
+    frame     = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+    if frame is None:
+        return jsonify({"phase": "unknown"})
+    result = detect_signal(img_bytes)
+    return jsonify({"phase": result.state, "confidence": result.confidence})
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5050)
+    try:
+        # Connect to an external address to find the real LAN IP (no packet sent)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        local_ip = "localhost"
+
+    print(f"\n{'='*50}")
+    print(f"  Local (Mac):  http://localhost:5051")
+    print(f"  Phone HTTP:   http://{local_ip}:5051")
+    print(f"  (Camera needs HTTPS — install pyopenssl for auto-SSL,")
+    print(f"   or run: ngrok http 5051)")
+    print(f"{'='*50}\n")
+
+    try:
+        import OpenSSL  # noqa: F401
+        print("SSL available — serving HTTPS on port 5051")
+        app.run(host="0.0.0.0", port=5051, ssl_context="adhoc")
+    except ImportError:
+        app.run(host="0.0.0.0", port=5051)

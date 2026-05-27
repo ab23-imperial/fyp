@@ -9,64 +9,31 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-rotate/dist/leaflet-rotate-src.js"></script>
 
   <link rel="stylesheet" href="drive_split.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#09090c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ArriveOnGreen">
+  <link rel="apple-touch-icon" href="/icon.svg">
 </head>
 <body>
 
-  <!-- FAR VIEW: map -->
-  <div id="map-shell" class="mini">
-    <div id="map-toggle">
-      <span></span>
-      <span></span>
-    </div>
-    
+  <!-- MAP — full width, top portion of viewport -->
+  <div id="map-shell">
     <div id="map"></div>
   </div>
 
-  <!-- MAP HUD -->
-  <div id="map-hud">
-    <div id="advice-card-map" style="
-      background: rgba(10,10,14,0.85);
-      border: 1px solid rgba(255,255,255,0.1);
-      backdrop-filter: blur(16px);
-      border-radius: 20px;
-      padding: 14px 28px;
-      display: flex; align-items: center; gap: 16px;
-    ">
-      <div id="map-signal-dot" style="width:12px;height:12px;border-radius:50%;background:#888;flex-shrink:0;transition:background 0.3s;"></div>
-      <div style="font-family:'Space Grotesk',sans-serif;">
-        <div id="map-advice" style="font-size:18px;font-weight:600;letter-spacing:-0.01em;">Loading...</div>
-        <div id="map-text" style="font-size:13px;color:rgba(240,240,240,0.5);margin-top:2px;"></div>
-      </div>
-    </div>
-  </div>
-
-  <div id="topbar">
-    <div id="dist-pill"><span id="dist-val">—</span> m</div>
-  </div>
-
-  <!-- ROAD SCENE — trapezium window clips everything inside -->
-  <div id="container">
-    <!-- static road background -->
-    <div id="road"></div>
-
-    <!-- tall rectangle overlay — JS moves this up/down -->
-    <div id="overlay"></div>
-
-    <!-- car fixed at 70% -->
-    <img id="car" src="/ui/lib/car.png" />
-  </div>
-
-  <!-- glowing seam -->
+  <!-- GLOWING SEAM between map and HUD -->
   <div id="divider"></div>
 
-  <!-- HUD PANEL -->
+  <!-- HUD PANEL — speedometer -->
   <div id="hud">
     <div id="speedometer-wrap">
-      <svg id="speedometer" viewBox="0 0 300 180">
+      <svg id="speedometer" viewBox="48 38 205 142">
 
-        <!-- background arc -->
         <path
           id="speed-arc-bg"
           d=""
@@ -76,7 +43,6 @@
           stroke-linecap="round"
         />
 
-        <!-- green target band -->
         <path
           id="speed-arc-target"
           d=""
@@ -86,10 +52,8 @@
           stroke-linecap="round"
         />
 
-        <!-- tick marks -->
         <g id="ticks"></g>
 
-        <!-- needle -->
         <line
           id="needle"
           x1="150" y1="150"
@@ -99,7 +63,6 @@
           stroke-linecap="round"
         />
 
-        <!-- centre hub -->
         <circle cx="150" cy="150" r="8" fill="white" opacity="0.9"/>
 
       </svg>
@@ -110,5 +73,6 @@
   </div>
 
   <script type="module" src="drive.js"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login • ArriveOnGreen</title>
+  <title>Sign Up • ArriveOnGreen</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,21 +19,17 @@
 
 <body>
 
-  <!-- background glow -->
   <div class="bg-glow"></div>
   <div class="grid"></div>
 
-  <!-- back button -->
-  <a href="/" class="back-link">
+  <a href="/login" class="back-link">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M19 12H5M12 19l-7-7 7-7"/>
     </svg>
     Back
   </a>
 
-  <!-- auth card -->
   <main class="auth-container">
-
     <div class="auth-card">
 
       <div class="logo">
@@ -41,11 +37,10 @@
         <span>ArriveOnGreen</span>
       </div>
 
-      <h1>Welcome back</h1>
-      <p class="subtitle">Sign in to continue navigating</p>
+      <h1>Create account</h1>
+      <p class="subtitle">Start navigating smarter</p>
 
-      <!-- Google sign-in -->
-      <button class="auth-btn google-btn" id="google-login">
+      <button class="auth-btn google-btn" id="google-signup">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -55,49 +50,40 @@
         Continue with Google
       </button>
 
-      <div class="divider">
-        <span>or</span>
-      </div>
+      <div class="divider"><span>or</span></div>
 
-      <!-- Email/Password form -->
-      <form class="auth-form" id="email-form">
+      <form class="auth-form" id="signup-form">
         <div class="form-group">
           <label for="email">Email</label>
-          <input
-            type="email"
-            id="email"
-            placeholder="you@example.com"
-            autocomplete="email"
-            required
-          />
+          <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required />
         </div>
 
         <div class="form-group">
           <label for="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            placeholder="••••••••"
-            autocomplete="current-password"
-            required
-          />
+          <input type="password" id="password" placeholder="Min. 6 characters" autocomplete="new-password" required minlength="6" />
         </div>
 
-        <button type="submit" class="auth-btn primary-btn">
-          Sign In
+        <div class="form-group">
+          <label for="confirm">Confirm Password</label>
+          <input type="password" id="confirm" placeholder="Repeat password" autocomplete="new-password" required minlength="6" />
+        </div>
+
+        <div id="error-msg" style="font-size:13px;color:#ef4444;display:none;margin-top:-8px;"></div>
+
+        <button type="submit" class="auth-btn primary-btn" id="submit-btn">
+          Create Account
         </button>
       </form>
 
       <p class="signup-prompt">
-        Don't have an account?
-        <a href="/signup">Sign up</a>
+        Already have an account?
+        <a href="/login">Sign in</a>
       </p>
 
     </div>
-
   </main>
 
-  <script type="module" src="login.js"></script>
+  <script type="module" src="signup.js"></script>
 
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
 </body>

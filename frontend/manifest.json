@@ -1,0 +1,18 @@
+{
+  "name": "ArriveOnGreen",
+  "short_name": "ArriveOnGreen",
+  "description": "Predictive traffic signal navigation",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090c",
+  "theme_color": "#09090c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
