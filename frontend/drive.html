@@ -21,12 +21,43 @@
 </head>
 <body>
 
-  <!-- MAP — full width, top portion of viewport -->
-  <div id="map-shell">
+  <!-- MAP — thumbnail (mini) or full-screen (full), tap to toggle -->
+  <div id="map-shell" class="mini">
+    <div id="map-toggle"></div>
     <div id="map"></div>
   </div>
 
-  <!-- GLOWING SEAM between map and HUD -->
+  <!-- MAP HUD — advice card shown when map is expanded -->
+  <div id="map-hud">
+    <div id="advice-card-map" style="
+      background: rgba(10,10,14,0.85);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 14px 28px;
+      display: flex; align-items: center; gap: 16px;
+    ">
+      <div id="map-signal-dot" style="width:12px;height:12px;border-radius:50%;background:#888;flex-shrink:0;transition:background 0.3s;"></div>
+      <div style="font-family:'Space Grotesk',sans-serif;">
+        <div id="map-advice" style="font-size:18px;font-weight:600;letter-spacing:-0.01em;">Loading...</div>
+        <div id="map-text" style="font-size:13px;color:rgba(240,240,240,0.5);margin-top:2px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISTANCE PILL -->
+  <div id="topbar">
+    <div id="dist-pill"><span id="dist-val">—</span> m</div>
+  </div>
+
+  <!-- ROAD SCENE — trapezium window clips everything inside -->
+  <div id="container">
+    <div id="road"></div>
+    <div id="overlay"></div>
+    <img id="car" src="/ui/lib/car.png" />
+  </div>
+
+  <!-- GLOWING SEAM between road and HUD -->
   <div id="divider"></div>
 
   <!-- HUD PANEL — speedometer -->

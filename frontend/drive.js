@@ -42,6 +42,26 @@ let cameraCtx = null;
 let cameraActive = false;
 let lastFrameTime = 0;
 
+// ── MAP TOGGLE — tap thumbnail to expand, tap button to minimise ──────────────
+const mapShell  = document.getElementById("map-shell");
+const mapToggle = document.getElementById("map-toggle");
+
+mapShell.addEventListener("click", () => {
+  if (mapShell.classList.contains("mini")) {
+    mapShell.classList.remove("mini");
+    mapShell.classList.add("full");
+    if (map) setTimeout(() => map.invalidateSize(), 500);
+  }
+});
+
+mapToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  mapShell.classList.remove("full");
+  mapShell.classList.add("mini");
+  if (map) setTimeout(() => map.invalidateSize(), 500);
+});
+
+
 // ── SPEEDOMETER GEOMETRY ──────────────────────────────────────────────────────
 const ticks = document.getElementById("ticks");
 
@@ -505,6 +525,91 @@ function updateUI(data) {
 
   if (needle)  needle.setAttribute("transform", `rotate(${mphToAngle(currentMph)} 150 150)`);
   if (readout) readout.textContent = `${Math.round(currentMph)} mph`;
+
+  // ── Overlay gradient ──
+  const amber_dur   = data?.amber_dur ?? 2;
+  const redBefore   = (data?.red_before_dur ?? 4) + 0.25 * amber_dur;
+  const greenDur    = (data?.green_dur ?? 8) + 0.5 * amber_dur;
+  const redAfter    = (data?.red_after_dur ?? 4) + 0.25 * amber_dur;
+  const total       = redBefore + greenDur + redAfter;
+  const r1End       = (redBefore / total) * 100;
+  const gStart      = r1End;
+  const gEnd        = gStart + (greenDur / total) * 100;
+  const r2Start     = gEnd;
+
+  const overlayEl   = document.getElementById("overlay");
+  if (overlayEl) {
+    const c = 33.333;
+    const s = (pct) => pct / 3;
+    overlayEl.style.background = `linear-gradient(to bottom,
+      #c21111        0%,
+      #e68917        ${s(r1End * 0.6).toFixed(2)}%,
+      #2c7d29        ${s(gStart).toFixed(2)}%,
+      #2c7d29        ${s(gEnd).toFixed(2)}%,
+      #e68917        ${s(r2Start + (100 - r2Start) * 0.4).toFixed(2)}%,
+      #c21111        ${c.toFixed(2)}%,
+
+      #c21111        ${c.toFixed(2)}%,
+      #e68917        ${(c + s(r1End * 0.6)).toFixed(2)}%,
+      #2c7d29        ${(c + s(gStart)).toFixed(2)}%,
+      #2c7d29        ${(c + s(gEnd)).toFixed(2)}%,
+      #e68917        ${(c + s(r2Start + (100 - r2Start) * 0.4)).toFixed(2)}%,
+      #c21111        ${(2 * c).toFixed(2)}%,
+
+      #c21111        ${(2 * c).toFixed(2)}%,
+      #e68917        ${(2 * c + s(r1End * 0.6)).toFixed(2)}%,
+      #2c7d29        ${(2 * c + s(gStart)).toFixed(2)}%,
+      #2c7d29        ${(2 * c + s(gEnd)).toFixed(2)}%,
+      #e68917        ${(2 * c + s(r2Start + (100 - r2Start) * 0.4)).toFixed(2)}%,
+      #c21111        100%
+    )`;
+  }
+
+  // ── Overlay position — scroll so car sits at correct phase colour ──
+  const containerEl = document.getElementById("container");
+  const delta = data?.delta_start;
+  if (delta != null && containerEl && overlayEl) {
+    const containerH = containerEl.clientHeight;
+    const cycleH     = containerH;
+    const topBound    = -redBefore;
+    const bottomBound = greenDur + redAfter;
+    const clamped     = Math.max(topBound, Math.min(delta, bottomBound));
+    const ratio       = (clamped - topBound) / (bottomBound - topBound);
+    const posInCycle  = ratio * cycleH;
+    const carScreenY  = containerH * 0.5;
+    const overlayTop  = carScreenY - cycleH - posInCycle;
+    overlayEl.style.top = `${overlayTop}px`;
+  }
+
+  // ── Road animation speed ──
+  const road = document.getElementById("road");
+  if (road) {
+    const duration = Math.max(0.1, 4 - (Math.min(currentMph, 80) / 80) * 3.8);
+    road.style.setProperty("--road-speed", `${duration}s`);
+  }
+
+  // ── Distance pill ──
+  const distVal = document.getElementById("dist-val");
+  if (distVal && data?.distance != null) distVal.textContent = Math.round(data.distance);
+
+  // ── Map HUD mirrors ──
+  const mapDot    = document.getElementById("map-signal-dot");
+  const mapAdvice = document.getElementById("map-advice");
+  const mapText   = document.getElementById("map-text");
+  const phase     = data?.phase;
+  const phaseColors = { green: "#4fffb0", amber: "#f59e0b", red: "#ef4444" };
+  if (mapDot && phase) mapDot.style.background = phaseColors[phase] || "#888";
+  const target_speed = data?.target_speed_mph;
+  if (mapAdvice && target_speed != null) {
+    const diff = target_speed - currentMph;
+    mapAdvice.textContent = Math.abs(diff) < 1 ? `${Math.round(target_speed)} mph`
+      : diff > 0 ? `↑ ${Math.round(target_speed)} mph`
+      : `↓ ${Math.round(target_speed)} mph`;
+    mapAdvice.style.color = diff > 1 ? "#f59e0b" : diff < -1 ? "#4fffb0" : "#f0f0f0";
+  }
+  if (mapText && data?.distance != null) {
+    mapText.textContent = `${Math.round(data.distance)}m away · ETA ${Math.round(data?.eta ?? 0)}s`;
+  }
 
   // ── Coloured route line ──
   colorRoute(data);
