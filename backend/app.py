@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory
 from collections import deque
+import os
 import time
 import base64
 import socket
@@ -32,8 +33,9 @@ world = {}
 # print("INIT WORLD:", world)
 
 # ---------------- VIDEO ----------------
-cap = cv2.VideoCapture("test_videos/tv1.mp4")
-video_fps = cap.get(cv2.CAP_PROP_FPS)
+_video_path = "test_videos/tv1.mp4"
+cap = cv2.VideoCapture(_video_path) if os.path.exists(_video_path) else None
+video_fps = cap.get(cv2.CAP_PROP_FPS) if cap else 25.0
 start_wall = time.time()
 
 # ---------------- STATE ----------------
@@ -167,12 +169,13 @@ def gps():
         frame     = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
         use_cam   = frame is not None
     else:
-        elapsed   = now - start_wall
-        frame_idx = int(elapsed * video_fps)
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-        ret, frame = cap.read()
-        if not ret:
-            frame = None
+        if cap:
+            elapsed   = now - start_wall
+            frame_idx = int(elapsed * video_fps)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+            ret, frame = cap.read()
+            if not ret:
+                frame = None
         use_cam = False
 
     route_idx = data.get("route_idx") or 0

@@ -1,3 +1,4 @@
+import os
 """
 Firestore-backed crowdsourced signal store.
 
@@ -17,15 +18,23 @@ _db = None
 def init_firestore(cred_path="firebase-service-account.json"):
     global _db
     try:
-        import firebase_admin
+        import firebase_admin, json, tempfile
         from firebase_admin import credentials, firestore as fs
         if not firebase_admin._apps:
-            cred = credentials.Certificate(cred_path)
+            env_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
+            if env_json:
+                tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+                tmp.write(env_json)
+                tmp.close()
+                cred = credentials.Certificate(tmp.name)
+            elif os.path.exists(cred_path):
+                cred = credentials.Certificate(cred_path)
+            else:
+                print(f"[signal_store] No service account file or env var — Firestore disabled")
+                return
             firebase_admin.initialize_app(cred)
         _db = fs.client()
         print("Firestore connected ✓")
-    except FileNotFoundError:
-        print(f"[signal_store] No service account at {cred_path} — Firestore disabled")
     except Exception as e:
         print(f"[signal_store] Firestore init failed: {e}")
 
