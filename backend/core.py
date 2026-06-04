@@ -6,6 +6,7 @@ import math
 from vision.detector import detect_signal
 from ui.simple_ui import SignalUI
 from phase_logger import PhaseLogger
+from signal_store import report_phase
 from world_builder import build_world
 
 # -------------------------
@@ -410,6 +411,19 @@ def step_core(
       state_buffer.clear()
       phase_reports.clear()
 
+      # Bootstrap cycle clock from Firestore if a recent report exists
+      fs_phase = signal.get("fs_phase")
+      fs_ts    = signal.get("fs_ts")
+      if fs_phase and fs_ts:
+          g, a = signal["green"], signal["amber"]
+          if fs_phase == "green":
+              state["signal_start_time"] = fs_ts
+          elif fs_phase == "amber":
+              state["signal_start_time"] = fs_ts - g
+          else:
+              state["signal_start_time"] = fs_ts - g - a
+          print(f"[Firestore] anchored cycle: phase={fs_phase} signal_id={signal['id']}")
+
       print(f"\n--- Switched to signal {signal['id']} ---\n")
     
     # distance = haversine(
@@ -479,6 +493,15 @@ def step_core(
             else:
                 state["signal_start_time"] = now - g - a
             print(f"Vision anchored cycle: phase={layer2_phase} signal_id={signal['id']}")
+
+        report_phase(
+            osm_id=signal.get("osm_id"),
+            lat=lat, lon=lon,
+            phase=layer2_phase,
+            green_dur=signal["green"],
+            amber_dur=signal["amber"],
+            red_dur=signal["red"],
+        )
 
         logger.log(
             signal_id=signal["id"],

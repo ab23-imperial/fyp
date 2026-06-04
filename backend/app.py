@@ -10,10 +10,12 @@ import requests
 from core import step_core, init_world
 from world_builder import build_world
 from phase_logger import PhaseLogger
+from signal_store import init_firestore
 
 app = Flask(__name__, static_folder="../frontend")
 
 logger = PhaseLogger()
+init_firestore()
 
 # ---------------- WORLD (single source of truth) ----------------
 # route, signals = init_world()

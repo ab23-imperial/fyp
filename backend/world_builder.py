@@ -154,6 +154,7 @@ def attach_timings(signals, route):
 
         result.append({
             "id": i,
+            "osm_id": node.get("id"),
             "lat": node["lat"],
             "lon": node["lon"],
             "route_idx": find_closest_route_index((node["lat"], node["lon"]), route),
@@ -192,6 +193,9 @@ def build_world(start, end):
     matched = match_signals(route, raw)
     signals = attach_timings(matched, route)
     signals.sort(key=lambda s: s["route_idx"])
+
+    from signal_store import fetch_phases
+    signals = fetch_phases(signals)
 
     WORLD_CACHE[key] = (route, signals, speed_limits)
     render_map(route, signals)
