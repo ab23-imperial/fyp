@@ -1,8 +1,12 @@
-from ultralytics import YOLO
+try:
+    from ultralytics import YOLO
+    model = YOLO("yolov8n.pt")
+    _YOLO_AVAILABLE = True
+except ImportError:
+    model = None
+    _YOLO_AVAILABLE = False
 import cv2
 import numpy as np
-
-model = YOLO("yolov8n.pt")
 
 class DetectionResult:
     def __init__(self, state, confidence):
