@@ -60,54 +60,50 @@
   <!-- GLOWING SEAM between road and HUD -->
   <div id="divider"></div>
 
-  <!-- HUD PANEL — speedometer -->
+  <!-- HUD PANEL — speedometer with SIM speed controls -->
   <div id="hud">
     <div id="speedometer-wrap">
-      <svg id="speedometer" viewBox="48 38 205 142">
+      <button class="sim-spd-btn" id="speed-down" ontouchstart="simSpeedChange(-1)" onclick="simSpeedChange(-1)">&#x2212;</button>
+      <div id="speedometer-inner">
+        <svg id="speedometer" viewBox="48 38 205 142">
 
-        <path
-          id="speed-arc-bg"
-          d=""
-          stroke="rgba(255,255,255,0.12)"
-          stroke-width="18"
-          fill="none"
-          stroke-linecap="round"
-        />
+          <path
+            id="speed-arc-bg"
+            d=""
+            stroke="rgba(255,255,255,0.12)"
+            stroke-width="18"
+            fill="none"
+            stroke-linecap="round"
+          />
 
-        <path
-          id="speed-arc-target"
-          d=""
-          stroke="#4fffb0"
-          stroke-width="18"
-          fill="none"
-          stroke-linecap="round"
-        />
+          <path
+            id="speed-arc-target"
+            d=""
+            stroke="#4fffb0"
+            stroke-width="18"
+            fill="none"
+            stroke-linecap="round"
+          />
 
-        <g id="ticks"></g>
+          <g id="ticks"></g>
 
-        <line
-          id="needle"
-          x1="150" y1="150"
-          x2="150" y2="50"
-          stroke="white"
-          stroke-width="4"
-          stroke-linecap="round"
-        />
+          <line
+            id="needle"
+            x1="150" y1="150"
+            x2="150" y2="50"
+            stroke="white"
+            stroke-width="4"
+            stroke-linecap="round"
+          />
 
-        <circle cx="150" cy="150" r="8" fill="white" opacity="0.9"/>
+          <circle cx="150" cy="150" r="8" fill="white" opacity="0.9"/>
 
-      </svg>
+        </svg>
 
-      <div id="speed-readout">0 mph</div>
-
+        <div id="speed-readout">0 mph</div>
+      </div>
+      <button class="sim-spd-btn" id="speed-up" ontouchstart="simSpeedChange(1)" onclick="simSpeedChange(1)">+</button>
     </div>
-  </div>
-
-
-  <!-- SIM speed controls (touch-friendly, hidden in REAL mode) -->
-  <div id="sim-speed-controls">
-    <button id="speed-up" ontouchstart="simSpeedChange(1)" onclick="simSpeedChange(1)">+</button>
-    <button id="speed-down" ontouchstart="simSpeedChange(-1)" onclick="simSpeedChange(-1)">&#x2212;</button>
   </div>
   <script type="module" src="drive.js"></script>
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>

@@ -27,13 +27,11 @@ html, body {
 .phase-amber { filter: drop-shadow(0 0 6px rgba(230,137,23,0.55)); }
 .phase-red   { filter: drop-shadow(0 0 6px rgba(194,17,17,0.55)); }
 
-/* ── CAR MARKER (Leaflet) ── */
+/* ── CAR MARKER (Leaflet) — arrow points in direction of travel ── */
 .car-dot {
-  width: 16px; height: 16px;
-  border-radius: 50%;
-  background: white;
-  border: 3px solid var(--accent);
-  box-shadow: 0 0 14px rgba(79,255,176,0.7), 0 0 4px rgba(0,0,0,0.8);
+  width: 16px; height: 22px;
+  filter: drop-shadow(0 0 6px rgba(79,255,176,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+  transform-origin: 8px 13px; /* anchor = circle centre */
 }
 
 /* ── SIGNAL MARKERS (Leaflet) ── */
@@ -342,7 +340,7 @@ html, body {
 
 /* ── MOBILE ── */
 @media (max-width: 700px) {
-  :root { --road-height: 52vh; }
+  :root { --road-height: 65vh; }
 
   #speedometer-wrap { width: min(95vw, 300px); }
 
@@ -351,3 +349,49 @@ html, body {
     margin-top: -6px;
   }
 }
+
+/* ── SIM speed buttons (flanking speedometer) ── */
+#speedometer-wrap {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 12px;
+}
+
+#speedometer-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.sim-spd-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid rgba(79,255,176,0.25);
+  background: rgba(10,10,14,0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--accent);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 26px;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+
+.sim-spd-btn:active {
+  background: rgba(79,255,176,0.15);
+  border-color: var(--accent);
+  transform: scale(0.93);
+}
+
+/* hide in REAL mode via JS */
+.sim-spd-btn.hidden { display: none; }

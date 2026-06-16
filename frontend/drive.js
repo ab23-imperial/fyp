@@ -348,10 +348,9 @@ window.simSpeedChange = function(delta) {
   SPEED = Math.max(0.1, SPEED + delta * (1 / 3.6));
 };
 
-// Hide controls in REAL mode
+// Hide buttons in REAL mode
 if (MODE !== "SIM") {
-  const ctrl = document.getElementById("sim-speed-controls");
-  if (ctrl) ctrl.style.display = "none";
+  document.querySelectorAll(".sim-spd-btn").forEach(b => b.classList.add("hidden"));
 }
 
 // ── GPS ───────────────────────────────────────────────────────────────────────
