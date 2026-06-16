@@ -103,6 +103,12 @@
     </div>
   </div>
 
+
+  <!-- SIM speed controls (touch-friendly, hidden in REAL mode) -->
+  <div id="sim-speed-controls">
+    <button id="speed-up" ontouchstart="simSpeedChange(1)" onclick="simSpeedChange(1)">+</button>
+    <button id="speed-down" ontouchstart="simSpeedChange(-1)" onclick="simSpeedChange(-1)">&#x2212;</button>
+  </div>
   <script type="module" src="drive.js"></script>
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
 </body>

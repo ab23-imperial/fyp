@@ -59,6 +59,29 @@
         Hey <span id="user-name"></span>, Where are<br>you <span>headed?</span>
       </h1>
 
+      <!-- start search (SIM only) -->
+      <div class="search-wrap sim-only" id="start-search-wrap">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="8.5" cy="8.5" r="5.5" fill="rgba(79,255,176,0.15)" stroke="var(--accent)"/>
+          <path d="M8.5 6v5M8.5 12.5v.5" stroke="var(--accent)" stroke-linecap="round"/>
+        </svg>
+        <input id="search-start" type="text" placeholder="Search start location..." autocomplete="off" />
+      </div>
+
+      <!-- start card (SIM only) -->
+      <div class="dest-card sim-only" id="start-card">
+        <div class="dest-icon" style="background:rgba(79,255,176,0.12)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="4" stroke="var(--accent)"/>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="var(--accent)" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="dest-info">
+          <div class="dest-label">Start</div>
+          <div class="dest-coords" id="start-coords">No start selected</div>
+        </div>
+      </div>
+
       <!-- search -->
       <div class="search-wrap">
         <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -103,7 +126,12 @@
       document.getElementById("mode").value = val;
       document.getElementById("btn-sim").classList.toggle("active", val === "SIM");
       document.getElementById("btn-real").classList.toggle("active", val === "REAL");
+      document.querySelectorAll(".sim-only").forEach(el => {
+        el.style.display = val === "SIM" ? "" : "none";
+      });
     }
+    // apply on load
+    document.addEventListener("DOMContentLoaded", () => setMode("SIM"));
   </script>
 
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>

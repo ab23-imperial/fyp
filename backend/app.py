@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import requests
 
-from core import step_core, init_world
+from core import step_core, init_world, SIM_INITIAL_PHASE
 from world_builder import build_world
 from phase_logger import PhaseLogger
 from signal_store import init_firestore
@@ -111,6 +111,12 @@ def init_route():
 
     global state
     state = reset_state()
+    # Offset clock so SIM starts on SIM_INITIAL_PHASE
+    if signals:
+        sig = signals[0]
+        g, a = sig["green"], sig["amber"]
+        offset = {"green": 0, "amber": g, "red": g + a}.get(SIM_INITIAL_PHASE, 0)
+        state["signal_start_time"] -= offset
     state_buffer.clear()
     phase_reports.clear()
 

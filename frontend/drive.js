@@ -50,7 +50,7 @@ mapShell.addEventListener("click", () => {
   if (mapShell.classList.contains("mini")) {
     mapShell.classList.remove("mini");
     mapShell.classList.add("full");
-    if (map) setTimeout(() => map.invalidateSize(), 500);
+    if (map) setTimeout(() => { map.invalidateSize(); map.setZoom(18); }, 500);
   }
 });
 
@@ -58,7 +58,7 @@ mapToggle.addEventListener("click", (e) => {
   e.stopPropagation();
   mapShell.classList.remove("full");
   mapShell.classList.add("mini");
-  if (map) setTimeout(() => map.invalidateSize(), 500);
+  if (map) setTimeout(() => { map.invalidateSize(); map.setZoom(16); }, 500);
 });
 
 
@@ -120,12 +120,12 @@ function initMap() {
   // Route line (placeholder — will be replaced by colorRoute each tick)
   routeLayer = L.layerGroup().addTo(map);
 
-  // Car marker
+  // Car marker — arrow points in direction of travel
   const carIcon = L.divIcon({
     className: "",
-    html: `<div class="car-dot"></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    html: `<div class="car-dot"><svg width="16" height="22" viewBox="0 0 16 22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 0 L16 17 L8 12 L0 17 Z" fill="white" opacity="0.95"/><circle cx="8" cy="13" r="3.5" fill="#4fffb0"/></svg></div>`,
+    iconSize: [16, 22],
+    iconAnchor: [8, 13],
   });
   marker = L.marker(first, { icon: carIcon }).addTo(map);
 }
@@ -343,6 +343,17 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "s") SPEED = Math.max(0.1, SPEED - 1 / 3.6);
 });
 
+// ── SIM TOUCH SPEED CONTROL ───────────────────────────────────────────────────
+window.simSpeedChange = function(delta) {
+  SPEED = Math.max(0.1, SPEED + delta * (1 / 3.6));
+};
+
+// Hide controls in REAL mode
+if (MODE !== "SIM") {
+  const ctrl = document.getElementById("sim-speed-controls");
+  if (ctrl) ctrl.style.display = "none";
+}
+
 // ── GPS ───────────────────────────────────────────────────────────────────────
 function getPhoneLocation() {
   return new Promise((resolve, reject) => {
@@ -445,9 +456,27 @@ async function loop() {
     const data = await res.json();
     updateUI(data);
 
-    if (marker) marker.setLatLng([lat, lon]);
+    if (marker) {
+      marker.setLatLng([lat, lon]);
+      // Rotate arrow to face direction of travel
+      const markerEl = marker.getElement();
+      if (markerEl) {
+        const dot = markerEl.querySelector(".car-dot");
+        if (dot) dot.style.transform = `rotate(${currentBearing}deg)`;
+      }
+    }
     if (USE_MAP && map) {
-      map.panTo([lat, lon]);
+      if (mapShell.classList.contains("full")) {
+        // Pan slightly ahead so road ahead fills the view (north-up, no tile rotation issues)
+        const lookM = 80;
+        const bearRad = currentBearing * Math.PI / 180;
+        const R = 6371000;
+        const dLat = (lookM * Math.cos(bearRad)) / R * (180 / Math.PI);
+        const dLon = (lookM * Math.sin(bearRad)) / (R * Math.cos(lat * Math.PI / 180)) * (180 / Math.PI);
+        map.panTo([lat + dLat, lon + dLon], { animate: true, duration: 0.2, noMoveStart: true });
+      } else {
+        map.panTo([lat, lon]);
+      }
     }
 
   } catch (err) {

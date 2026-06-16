@@ -107,8 +107,8 @@ def haversine(a, b):
 
 # ---------------- TIMINGS ----------------
 _DEFAULT_GREEN = 30
-_DEFAULT_AMBER = 3
-_DEFAULT_RED   = 30
+_DEFAULT_AMBER = 2
+_DEFAULT_RED   = 6
 
 def _parse_seconds(val, default):
     """Parse an OSM tag value like "30" or "30 s" to an integer number of seconds."""
@@ -183,6 +183,8 @@ def round_coord(c):
 
 
 def build_world(start, end):
+    # start = (51.4995937, -0.1966461)
+    # end=(51.4986222, -0.1996693)
     key = (round_coord(start), round_coord(end))
 
     if key in WORLD_CACHE:

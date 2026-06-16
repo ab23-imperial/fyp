@@ -23,14 +23,19 @@ onAuthStateChanged(auth, (user) => {
 
 let map;
 let marker;
+let startMarker;
 let selectedLat = null;
 let selectedLon = null;
 let selectedName = null;
 let selectedAddress = null;
+let startLat = null;
+let startLon = null;
+let startName = null;
 
 window.addEventListener("load", () => {
   initMap();
   initSearch();
+  initStartSearch();
   initStart();
   initAvatar();
 });
@@ -82,6 +87,38 @@ function initSearch() {
     map.setZoom(15);
     setMarker(lat, lng);
   });
+}
+
+function initStartSearch() {
+  const input = document.getElementById("search-start");
+  const ac = new google.maps.places.Autocomplete(input);
+
+  ac.addListener("place_changed", () => {
+    const place = ac.getPlace();
+    if (!place.geometry) return;
+
+    const lat = place.geometry.location.lat();
+    const lng = place.geometry.location.lng();
+
+    startLat = lat;
+    startLon = lng;
+    startName = place.name || place.formatted_address || "Start";
+
+    setStartMarker(lat, lng);
+
+    const card = document.getElementById("start-card");
+    const coords = document.getElementById("start-coords");
+    if (card) card.classList.add("has-dest");
+    if (coords) coords.textContent = startName;
+  });
+}
+
+async function setStartMarker(lat, lon) {
+  if (startMarker) startMarker.setMap(null);
+  const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+  const pin = document.createElement("div");
+  pin.style.cssText = "width:14px;height:14px;border-radius:50%;background:#4fffb0;border:2px solid #fff;box-shadow:0 0 8px rgba(79,255,176,0.7)";
+  startMarker = new AdvancedMarkerElement({ map, position: { lat, lng: lon }, content: pin });
 }
 
 // in index.js, replace updateDestCard call in setMarker:
@@ -148,7 +185,8 @@ window.start = async function () {
     const gps = await getPhoneLocation();
     start = [gps.lat, gps.lon];
   } else {
-    start = [51.5023, -0.1882];
+    if (startLat == null || startLon == null) { alert("Pick a start location first"); return; }
+    start = [startLat, startLon];
   }
 
   const res = await fetch("/init_route", {

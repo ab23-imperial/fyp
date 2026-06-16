@@ -29,6 +29,9 @@ DETECT_INTERVAL = 0.1
 SIM_SPEED = 12
 SIM_INITIAL_DISTANCE = 120
 
+# Set to "green", "amber", or "red" to control which phase the clock starts on
+SIM_INITIAL_PHASE = "green"
+
 SWITCH_DISTANCE_THRESHOLD = 20
 
 # SIGNALS = [

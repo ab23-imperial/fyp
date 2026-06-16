@@ -146,6 +146,26 @@ body {
   z-index: 2;
 }
 
+#search-start {
+  width: 100%;
+  padding: 13px 16px 13px 42px;
+  background: var(--surface2);
+  border: 1px solid rgba(79,255,176,0.2);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+#search-start::placeholder { color: var(--muted); }
+
+#search-start:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
 #search {
   width: 100%;
   padding: 13px 16px 13px 42px;
