@@ -343,15 +343,6 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "s") SPEED = Math.max(0.1, SPEED - 1 / 3.6);
 });
 
-// ── SIM TOUCH SPEED CONTROL ───────────────────────────────────────────────────
-window.simSpeedChange = function(delta) {
-  SPEED = Math.max(0.1, SPEED + delta * (1 / 3.6));
-};
-
-// Hide buttons in REAL mode
-if (MODE !== "SIM") {
-  document.querySelectorAll(".sim-spd-btn").forEach(b => b.classList.add("hidden"));
-}
 
 // ── GPS ───────────────────────────────────────────────────────────────────────
 function getPhoneLocation() {

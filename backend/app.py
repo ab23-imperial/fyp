@@ -243,15 +243,15 @@ if __name__ == "__main__":
         local_ip = "localhost"
 
     print(f"\n{'='*50}")
-    print(f"  Local (Mac):  http://localhost:5051")
-    print(f"  Phone HTTP:   http://{local_ip}:5051")
+    print(f"  Local (Mac):  http://localhost:5052")
+    print(f"  Phone HTTP:   http://{local_ip}:5052")
     print(f"  (Camera needs HTTPS — install pyopenssl for auto-SSL,")
-    print(f"   or run: ngrok http 5051)")
+    print(f"   or run: ngrok http 5052)")
     print(f"{'='*50}\n")
 
     try:
         import OpenSSL  # noqa: F401
-        print("SSL available — serving HTTPS on port 5051")
-        app.run(host="0.0.0.0", port=5051, ssl_context="adhoc")
+        print("SSL available — serving HTTPS on port 5052")
+        app.run(host="0.0.0.0", port=5052, ssl_context="adhoc")
     except ImportError:
-        app.run(host="0.0.0.0", port=5051)
+        app.run(host="0.0.0.0", port=5052)
